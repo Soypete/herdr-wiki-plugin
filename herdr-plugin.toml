@@ -1,0 +1,56 @@
+id = "haikei.wiki"
+name = "Haikei Wiki"
+version = "0.1.0"
+min_herdr_version = "0.7.5"
+description = "Search the LLM-Wiki and capture provenance-tagged notes into its inbox"
+platforms = ["linux", "macos"]
+
+[[actions]]
+id = "search"
+title = "Wiki search"
+contexts = ["workspace"]
+command = ["python3", "bin/wiki_search.py"]
+
+[[actions]]
+id = "capture"
+title = "Wiki capture"
+contexts = ["workspace"]
+command = ["python3", "bin/wiki_capture.py"]
+
+[[actions]]
+id = "organize"
+title = "Wiki organize inbox"
+contexts = ["workspace"]
+command = ["python3", "bin/wiki_organize.py"]
+
+[[actions]]
+id = "context-dump"
+title = "Dump plugin context"
+contexts = ["workspace"]
+command = ["python3", "bin/wiki_context_dump.py"]
+
+[[panes]]
+id = "search"
+title = "Wiki search"
+placement = "popup"
+width = "80%"
+command = ["python3", "bin/wiki_search_ui.py"]
+
+[[panes]]
+id = "capture"
+title = "Wiki capture"
+placement = "popup"
+width = "80%"
+command = ["python3", "bin/wiki_capture_ui.py"]
+
+[[keys.command]]
+key = "prefix+w"
+type = "plugin_action"
+command = "haikei.wiki.search"
+description = "wiki search"
+
+[[keys.command]]
+key = "prefix+W"
+type = "plugin_action"
+command = "haikei.wiki.capture"
+description = "wiki capture"

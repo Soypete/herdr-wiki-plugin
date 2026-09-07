@@ -1,0 +1,29 @@
+# PROVISIONAL capture vocabulary for the haikei.wiki plugin.
+#
+# This is a CLOSED vocabulary: a capture whose entity type or link predicate
+# is not listed here is REJECTED at the write boundary. Nothing is normalized
+# or coerced to a default. Schema changes are a human decision - edit this
+# file (in $HERDR_PLUGIN_CONFIG_DIR/tbox.toml), do not expect the plugin to
+# invent new terms.
+#
+# This file is a pure config artifact, shaped like a minimal T-box
+# (entity types + link predicates) so it can later be replaced by a proper
+# capture T-box (a new .ttl in the Soypete/ontologies repo) without changing
+# plugin code. It is deliberately NOT the education T-box
+# (education/TBOX_LEARNING_SOFTWARE.ttl, namespace http://soypete.tech/l2ws/),
+# which models software curricula - not wiki captures. Captures must not be
+# typed with sw: terms.
+
+[entity_types]
+source = "An immutable raw source document ingested into the wiki (raw/ + a wiki page)."
+claim = "A discrete assertion extracted from a source, conversation, or pane."
+entity = "A named thing (person, project, tool, concept) worth its own page."
+contradiction = "A recorded conflict between two claims or pages."
+decision = "A recorded decision with its context and rationale."
+
+[link_predicates]
+derived_from = "This capture is derived from the target source/page."
+contradicts = "This claim or page contradicts the target."
+supports = "This capture provides evidence supporting the target claim."
+about = "This capture is about the target entity."
+relates_to = "General association with the target page."
