@@ -1,0 +1,23 @@
+{
+  "name": "herdr-wiki",
+  "version": "0.1.0",
+  "description": "Search and capture in the personal LLM-Wiki knowledge base from within a Codex session.",
+  "author": {
+    "name": "Miriah Peterson",
+    "url": "https://github.com/Soypete"
+  },
+  "repository": "https://github.com/Soypete/herdr-wiki-plugin",
+  "license": "MIT",
+  "skills": "./skills/",
+  "keywords": ["wiki", "knowledge base", "memory", "capture", "search", "llm-wiki"],
+  "interface": {
+    "displayName": "Herdr Wiki",
+    "shortDescription": "Search and capture in your LLM-Wiki",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "Search the wiki for prior notes on memory indexing systems.",
+      "Capture this finding into the wiki as a claim."
+    ]
+  }
+}

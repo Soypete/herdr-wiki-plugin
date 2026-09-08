@@ -92,37 +92,40 @@ Run organize whenever you want pending captures folded into the wiki.
 
 The `prefix+w` popup is a **human** UI. An agent (opencode, claude, codex, …)
 running in a pane searches the wiki by running a command and reading stdout.
-Two equivalent ways:
+Everything delegates to the same `wiki` command, so behavior is identical
+everywhere.
 
-**1. opencode skill** (recommended — the agent invokes it as a first-class
-command). Add `skills/` to your project and allow it in `opencode.json`:
-
-```json
-{ "permission": { "skill": { "wiki": "allow" } } }
-```
-
-Then in an opencode session:
+**One-time setup** — put the launcher on PATH:
 
 ```
-/wiki whitepaper
-/wiki memory indexing --top-k 5
-/wiki whitepaper --json
-/wiki stats
-/wiki capture --title "finding" --type claim --content "..." --link derived_from:imported/whitepaper
+ln -s "$(pwd)/bin/wiki" ~/.local/bin/wiki
 ```
 
-A bare first argument is treated as a search, so `/wiki <query>` just works.
-
-**2. Plain CLI** (any agent with a shell). From the repo root:
+Then the commands are:
 
 ```
-python3 -m haikei_wiki search <query> [--top-k N] [--json]
-python3 -m haikei_wiki stats
-python3 -m haikei_wiki capture --title T --type T --content C [--link p:t ...]
-python3 -m haikei_wiki organize
+wiki search <query> [--top-k N] [--json]
+wiki stats
+wiki capture --title T --type T --content C [--link p:t ...]
+wiki organize
 ```
 
-Both paths share the same code (`haikei_wiki.cli`), the same closed
+### Per-agent skills
+
+Each agent gets a native skill that runs `wiki <args>`. See
+[`skills/README.md`](skills/README.md) for full install steps.
+
+| Agent | Skill | Install |
+| --- | --- | --- |
+| opencode | `skills/wiki.md` + `skills/wiki.py` | allow `wiki` in `opencode.json`, then `/wiki <query>` |
+| Claude Code | `skills/claude/wiki/SKILL.md` | copy to `~/.claude/skills/wiki/` |
+| Codex | `skills/codex/` (plugin + marketplace) | `codex plugin marketplace add …/skills/codex && codex plugin add herdr-wiki --marketplace herdr-wiki` |
+
+In an opencode session, a bare first argument is a search, so `/wiki
+<query>` just works. Any agent can also run the CLI directly
+(`python3 -m haikei_wiki …`) without a skill.
+
+All paths share the same code (`haikei_wiki.cli`), the same closed
 vocabulary, and the same single-writer inbox — so an agent capture and a
 human `prefix+W` capture land identically.
 

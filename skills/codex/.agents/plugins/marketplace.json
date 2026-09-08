@@ -1,0 +1,20 @@
+{
+  "name": "herdr-wiki",
+  "interface": {
+    "displayName": "Herdr Wiki"
+  },
+  "plugins": [
+    {
+      "name": "herdr-wiki",
+      "source": {
+        "source": "local",
+        "path": "./plugins/herdr-wiki"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

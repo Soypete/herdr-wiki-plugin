@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+# wiki — agent-facing launcher for the haikei_wiki CLI.
+#
+# Resolves its real location (following symlinks) and forces the repo root to
+# the front of sys.path, so it works from any cwd and via a PATH symlink.
+#
+# Symlink it onto PATH for a stable `wiki` command:
+#   ln -s "$(pwd)/bin/wiki" ~/.local/bin/wiki
+# then any agent (opencode, claude, codex) can run:  wiki search <query>
+
+exec python3 - "$0" "$@" <<'PY'
+import os, sys
+
+root = os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[1])))
+sys.path.insert(0, root)
+
+from haikei_wiki.cli import main
+
+sys.exit(main(sys.argv[2:]))
+PY
