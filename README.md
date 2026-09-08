@@ -117,13 +117,12 @@ Each agent gets a native skill that runs `wiki <args>`. See
 
 | Agent | Skill | Install |
 | --- | --- | --- |
-| opencode | `skills/wiki.md` + `skills/wiki.py` | allow `wiki` in `opencode.json`, then `/wiki <query>` |
+| opencode | `.opencode/skills/wiki/SKILL.md` | already allowed in this repo's `opencode.json`; copy the skill + `permission.skill.wiki = allow` to other projects |
 | Claude Code | `skills/claude/wiki/SKILL.md` | copy to `~/.claude/skills/wiki/` |
 | Codex | `skills/codex/` (plugin + marketplace) | `codex plugin marketplace add …/skills/codex && codex plugin add herdr-wiki --marketplace herdr-wiki` |
 
-In an opencode session, a bare first argument is a search, so `/wiki
-<query>` just works. Any agent can also run the CLI directly
-(`python3 -m haikei_wiki …`) without a skill.
+Any agent can also run the CLI directly (`python3 -m haikei_wiki …`) without
+a skill.
 
 All paths share the same code (`haikei_wiki.cli`), the same closed
 vocabulary, and the same single-writer inbox — so an agent capture and a

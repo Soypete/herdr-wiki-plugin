@@ -23,16 +23,24 @@ directory and via the symlink.
 
 ## opencode
 
-Skill lives at `skills/wiki.md` + `skills/wiki.py` (discovered from the
-`skills/` dir). Allow it in `opencode.json`:
+The skill is a standard OpenCode skill at `.opencode/skills/wiki/SKILL.md`
+(discovered when OpenCode runs in this repo). The repo's `opencode.json`
+already allows it:
 
 ```json
 { "permission": { "skill": { "wiki": "allow" } } }
 ```
 
-Then in an opencode session: `/wiki whitepaper`, `/wiki stats`, …
+To use it in another project, copy the skill and the permission:
 
-A bare first argument is treated as a search, so `/wiki <query>` just works.
+```
+mkdir -p .opencode/skills/wiki
+cp /path/to/herdr-wiki-plugin/.opencode/skills/wiki/SKILL.md .opencode/skills/wiki/
+```
+
+and add `permission.skill.wiki = allow` to that project's `opencode.json`.
+Then in an opencode session the agent can run `wiki search <query>`,
+`wiki stats`, …
 
 ## Claude Code
 

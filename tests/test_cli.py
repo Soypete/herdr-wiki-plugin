@@ -1,23 +1,13 @@
 """CLI + opencode skill: the agent-context lookup path (search/capture)."""
 
-import importlib.util
 import json
-import sys
+import re
 from pathlib import Path
-
-import pytest
 
 import haikei_wiki.cli as cli
 
-STARTER = Path(__file__).resolve().parent.parent / "haikei_wiki" / "starter_tbox.toml"
-
-
-def _load_skill():
-    p = Path(__file__).resolve().parent.parent / "skills" / "wiki.py"
-    spec = importlib.util.spec_from_file_location("wiki_skill", p)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+ROOT = Path(__file__).resolve().parent.parent
+STARTER = ROOT / "haikei_wiki" / "starter_tbox.toml"
 
 
 def _make_wiki(tmp_path: Path) -> Path:
@@ -69,31 +59,20 @@ def test_cli_capture_out_of_vocabulary_rejected(tmp_path, monkeypatch):
     assert not (wiki / "inbox").exists() or not list((wiki / "inbox").glob("*.json"))
 
 
-def test_skill_defaults_bare_query_to_search(monkeypatch):
-    mod = _load_skill()
-    seen = {}
-
-    def fake(argv):
-        seen["argv"] = argv
-        return 0
-
-    monkeypatch.setattr(mod, "main", fake)
-    monkeypatch.setattr(sys, "argv", ["wiki.py", "whitepaper", "--top-k", "2"])
-    with pytest.raises(SystemExit):
-        mod.run()
-    assert seen["argv"] == ["search", "whitepaper", "--top-k", "2"]
+def test_opencode_skill_present_with_required_frontmatter():
+    skill = ROOT / ".opencode" / "skills" / "wiki" / "SKILL.md"
+    assert skill.exists(), "opencode skill SKILL.md is missing"
+    text = skill.read_text()
+    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    assert m, "SKILL.md must start with YAML frontmatter"
+    fm = m.group(1)
+    assert re.search(r"^name: wiki$", fm, re.M), "frontmatter must set name: wiki"
+    assert re.search(r"^description: .+", fm, re.M), "frontmatter must set description"
 
 
-def test_skill_passes_subcommand_through(monkeypatch):
-    mod = _load_skill()
-    seen = {}
-
-    def fake(argv):
-        seen["argv"] = argv
-        return 0
-
-    monkeypatch.setattr(mod, "main", fake)
-    monkeypatch.setattr(sys, "argv", ["wiki.py", "stats"])
-    with pytest.raises(SystemExit):
-        mod.run()
-    assert seen["argv"] == ["stats"]
+def test_opencode_config_allows_only_the_wiki_skill():
+    cfg = json.loads((ROOT / "opencode.json").read_text())
+    skills = cfg.get("permission", {}).get("skill", {})
+    assert skills.get("wiki") == "allow", "permission.skill.wiki must be 'allow'"
+    # minimal + scoped: no unrelated skill permissions are introduced
+    assert set(skills) == {"wiki"}
