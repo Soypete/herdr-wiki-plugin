@@ -19,8 +19,13 @@ try:
     from watchdog.observers import Observer
 
     WATCHDOG_AVAILABLE = True
+    _FSHandlerBase = watchdog.events.FileSystemEventHandler
 except ImportError:
     WATCHDOG_AVAILABLE = False
+
+    class _FSHandlerBase:  # pragma: no cover - only used when watchdog is present
+        pass
+
 
 from .interfaces import (
     MemoryResult,
@@ -430,7 +435,7 @@ class LLMWikiAdapter:
         return watcher
 
 
-class WikiFileHandler(watchdog.events.FileSystemEventHandler):
+class WikiFileHandler(_FSHandlerBase):
     """Handler for wiki file system events."""
 
     def __init__(

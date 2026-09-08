@@ -88,6 +88,44 @@ herdr plugin pane open --plugin haikei.wiki --entrypoint capture \
 
 Run organize whenever you want pending captures folded into the wiki.
 
+## Search from an agent (agent-context lookup)
+
+The `prefix+w` popup is a **human** UI. An agent (opencode, claude, codex, …)
+running in a pane searches the wiki by running a command and reading stdout.
+Two equivalent ways:
+
+**1. opencode skill** (recommended — the agent invokes it as a first-class
+command). Add `skills/` to your project and allow it in `opencode.json`:
+
+```json
+{ "permission": { "skill": { "wiki": "allow" } } }
+```
+
+Then in an opencode session:
+
+```
+/wiki whitepaper
+/wiki memory indexing --top-k 5
+/wiki whitepaper --json
+/wiki stats
+/wiki capture --title "finding" --type claim --content "..." --link derived_from:imported/whitepaper
+```
+
+A bare first argument is treated as a search, so `/wiki <query>` just works.
+
+**2. Plain CLI** (any agent with a shell). From the repo root:
+
+```
+python3 -m haikei_wiki search <query> [--top-k N] [--json]
+python3 -m haikei_wiki stats
+python3 -m haikei_wiki capture --title T --type T --content C [--link p:t ...]
+python3 -m haikei_wiki organize
+```
+
+Both paths share the same code (`haikei_wiki.cli`), the same closed
+vocabulary, and the same single-writer inbox — so an agent capture and a
+human `prefix+W` capture land identically.
+
 ## Configuration
 
 | Setting | Where | Default |
