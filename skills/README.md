@@ -71,6 +71,17 @@ codex plugin list | grep herdr-wiki
 
 It registers the `wiki` skill, which runs `wiki <args>`.
 
+## Alternative: `CLAUDE.md` / `AGENTS.md` (no skill needed)
+
+If you don't want to set up a skill/plugin, put the commands in the agent's
+instruction file instead — it's read at session start, so the agent always
+knows the wiki exists:
+
+- **Claude Code** → paste into your project's `CLAUDE.md`
+- **Codex** (and most other agents) → paste into your project's `AGENTS.md`
+
+The ready-to-paste block is in [`../agent-instructions.md`](../agent-instructions.md).
+
 ## The commands (all agents)
 
 ```

@@ -128,6 +128,35 @@ All paths share the same code (`haikei_wiki.cli`), the same closed
 vocabulary, and the same single-writer inbox — so an agent capture and a
 human `prefix+W` capture land identically.
 
+### Teach your agents via `CLAUDE.md` / `AGENTS.md` (no skill needed)
+
+The simplest way to make an agent use the wiki is to put the commands in its
+instruction file, which the agent reads at session start:
+
+- **Claude Code** → add the block to your project's `CLAUDE.md`
+- **Codex** (and most other agents) → add it to your project's `AGENTS.md`
+
+A ready-to-paste block lives in
+[`agent-instructions.md`](agent-instructions.md). Copy its `## Wiki` section
+into `CLAUDE.md` and/or `AGENTS.md`, e.g.:
+
+```markdown
+## Wiki (personal knowledge base)
+
+You have a `wiki` command for a personal LLM-Wiki knowledge base.
+- Search before answering: `wiki search <query> [--top-k N] [--json]`
+- Capture a durable finding:
+  `wiki capture --title "..." --type claim --content "..."`
+- `--type` ∈ {claim, contradiction, decision, entity, source}; link
+  `predicate` ∈ {derived_from, contradicts, supports, about, relates_to}.
+- Captures land in an inbox; do not edit wiki pages directly.
+```
+
+This needs no skill/plugin mechanism — the agent sees the commands in its
+context and runs them. Prefer this if you don't want to set up the per-agent
+skills above. (You can use both: the skill for on-demand loading, the
+`CLAUDE.md`/`AGENTS.md` block for always-on awareness.)
+
 ## Configuration
 
 | Setting | Where | Default |
@@ -169,8 +198,12 @@ worktree field).
 
 ```
 herdr-plugin.toml        # Herdr manifest (actions, panes, keybindings)
+opencode.json            # OpenCode permission (skill.wiki = allow)
+agent-instructions.md    # paste-me block for CLAUDE.md / AGENTS.md
 bin/                     # thin entrypoints Herdr launches
+  wiki                   # agent-facing CLI launcher (symlink onto PATH)
 haikei_wiki/             # the logic package (testable)
+  cli.py                 # agent-context CLI (search/stats/capture/organize)
   vocabulary.py          # closed-vocabulary loader + write-boundary checks
   context.py             # HERDR_PLUGIN_CONTEXT_JSON -> provenance
   capture.py             # atomic inbox writer + log append
@@ -179,7 +212,11 @@ haikei_wiki/             # the logic package (testable)
   adapter.py             # vendored LLMWikiAdapter (storage layer)
   interfaces.py          # vendored shared dataclasses
   starter_tbox.toml      # PROVISIONAL starter vocabulary
-tests/                   # pytest suite (15 tests)
+.opencode/skills/wiki/   # OpenCode skill (SKILL.md)
+skills/                  # skills for other agents
+  claude/wiki/SKILL.md   # Claude Code skill
+  codex/                 # Codex plugin + local marketplace
+tests/                   # pytest suite (19 tests)
 ```
 
 ## Development
