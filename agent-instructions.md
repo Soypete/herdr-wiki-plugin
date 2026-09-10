@@ -11,7 +11,10 @@ You have a `wiki` command for a personal LLM-Wiki knowledge base. It prints
 results to stdout, so run it and read the output.
 
 - **Before answering** about a topic, search for prior notes/claims:
-  `wiki search <query> [--top-k N] [--json]`
+  `wiki search <query> [--top-k N] [--no-inbox] [--json]`
+  Search includes pending inbox records (another agent's unorganized
+  captures) by default, marked `inbox:`; pass `--no-inbox` to see only
+  settled wiki pages.
 - **When you learn something durable**, capture it:
   `wiki capture --title "..." --type claim --content "..." [--link predicate:target]`
 - **Stats:** `wiki stats`
@@ -20,10 +23,11 @@ results to stdout, so run it and read the output.
 
 Rules:
 - `--type` must be one of: `claim`, `contradiction`, `decision`, `entity`,
-  `source`.
+  `source`, `blocker`, `handoff`, `ack`, `release`, `contract_change`.
 - Link `predicate` must be one of: `derived_from`, `contradicts`, `supports`,
-  `about`, `relates_to`.
+  `about`, `relates_to`, `answers`, `acknowledges`, `blocks`.
 - Invalid types/predicates are rejected — do not guess or coerce a value.
-- Captures land in an inbox; do **not** edit wiki pages directly.
+- Captures land in an inbox; do **not** edit wiki pages directly. Search is
+  read-only on the inbox — only a human's `wiki organize` changes it.
 - If `wiki` is not on PATH, run
   `python3 /path/to/herdr-wiki-plugin/bin/wiki <args>`.

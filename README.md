@@ -81,7 +81,12 @@ herdr plugin pane open --plugin haikei.wiki --entrypoint capture \
 
 1. **Capture** (`prefix+W`) writes one atomic JSON file to `<wiki>/inbox/`
    and one line to `<wiki>/log.md`. It never touches the wiki graph.
-2. **Organize** (`herdr plugin action invoke haikei.wiki.organize`) is the
+2. **Search** (`prefix+w`, `wiki search`) reads both the wiki graph **and**
+   the pending inbox, so a capture is visible to other agents immediately —
+   pending records are marked `inbox:` in results. `--no-inbox` limits the
+   search to settled pages. Search is read-only: it never organizes, moves,
+   or mutates inbox records.
+3. **Organize** (`herdr plugin action invoke haikei.wiki.organize`) is the
    single writer to the graph: it turns each inbox record into a page under
    `<wiki>/wiki/<type>/`, updates `<wiki>/index.md`, appends to `log.md`, and
    moves the record to `inbox/processed/` (or `inbox/rejected/`).
@@ -104,7 +109,7 @@ ln -s "$(pwd)/bin/wiki" ~/.local/bin/wiki
 Then the commands are:
 
 ```
-wiki search <query> [--top-k N] [--json]
+wiki search <query> [--top-k N] [--no-inbox] [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link p:t ...]
 wiki organize
@@ -144,12 +149,15 @@ into `CLAUDE.md` and/or `AGENTS.md`, e.g.:
 ## Wiki (personal knowledge base)
 
 You have a `wiki` command for a personal LLM-Wiki knowledge base.
-- Search before answering: `wiki search <query> [--top-k N] [--json]`
+- Search before answering: `wiki search <query> [--top-k N] [--no-inbox] [--json]`
+  (pending inbox captures are included by default, marked `inbox:`).
 - Capture a durable finding:
   `wiki capture --title "..." --type claim --content "..."`
-- `--type` ∈ {claim, contradiction, decision, entity, source}; link
-  `predicate` ∈ {derived_from, contradicts, supports, about, relates_to}.
-- Captures land in an inbox; do not edit wiki pages directly.
+- `--type` ∈ {claim, contradiction, decision, entity, source, blocker,
+  handoff, ack, release, contract_change}; link `predicate` ∈ {derived_from,
+  contradicts, supports, about, relates_to, answers, acknowledges, blocks}.
+- Captures land in an inbox; do not edit wiki pages directly. Search never
+  changes the inbox — only a human's `wiki organize` does.
 ```
 
 This needs no skill/plugin mechanism — the agent sees the commands in its
@@ -179,12 +187,18 @@ coerced to a default. The organizer only proposes types from the loaded
 vocabulary; it never invents new ones.
 
 Starter entity types: `source`, `claim`, `entity`, `contradiction`,
-`decision`. Starter link predicates: `derived_from`, `contradicts`,
-`supports`, `about`, `relates_to`.
+`decision`, `blocker`, `handoff`, `ack`, `release`, `contract_change`.
+Starter link predicates: `derived_from`, `contradicts`, `supports`, `about`,
+`relates_to`, `answers`, `acknowledges`, `blocks`.
 
 The file is a pure config artifact, shaped like a minimal T-box, so it can
 later be replaced by a proper capture T-box (a `.ttl`) without changing plugin
 code. To add a type or predicate, edit `tbox.toml` — that is a human decision.
+
+> Note: `vocabulary.py` seeds `$HERDR_PLUGIN_CONFIG_DIR/tbox.toml` from
+> `starter_tbox.toml` only on first run and never overwrites an existing file.
+> If your live config dir already has a `tbox.toml`, edit that file (not the
+> starter) to pick up new types/predicates.
 
 ## Provenance
 
@@ -216,7 +230,7 @@ haikei_wiki/             # the logic package (testable)
 skills/                  # skills for other agents
   claude/wiki/SKILL.md   # Claude Code skill
   codex/                 # Codex plugin + local marketplace
-tests/                   # pytest suite (19 tests)
+tests/                   # pytest suite (34 tests)
 ```
 
 ## Development

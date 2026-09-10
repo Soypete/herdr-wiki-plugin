@@ -8,6 +8,7 @@ and installable on its own. Based on Karpathy's LLM-Wiki pattern:
 - Schema (AGENTS.md style instructions)
 """
 
+import json
 import subprocess
 import threading
 from datetime import datetime
@@ -77,6 +78,7 @@ class LLMWiki:
         self.index_file = self.wiki_path / "index.md"
         self.log_file = self.wiki_path / "log.md"
         self.schema_file = self.wiki_path / "AGENTS.md"
+        self.inbox_dir = self.wiki_path / "inbox"
 
         # Ensure structure exists
         self.raw_path.mkdir(parents=True, exist_ok=True)
@@ -139,6 +141,45 @@ class LLMWiki:
         # Sort by score and limit
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:top_k]
+
+    def search_inbox(self, query: str) -> list[dict]:
+        """Search pending inbox records by title and content.
+
+        Read-only: never organizes, moves, or mutates inbox records; the
+        organizer remains the only writer to the graph. Malformed or
+        unreadable JSON records are skipped, not fatal.
+        """
+        results = []
+        if not self.inbox_dir.exists():
+            return results
+
+        q = query.lower()
+        for path in self.inbox_dir.glob("*.json"):
+            try:
+                record = json.loads(path.read_text())
+            except (json.JSONDecodeError, OSError):
+                continue
+
+            title = str(record.get("title", ""))
+            content = str(record.get("content", ""))
+            if q in title.lower():
+                score = 0.9
+            elif q in content.lower():
+                score = 0.6
+            else:
+                continue
+
+            # "inbox:" prefix + source mark the record as pending/unorganized
+            # so an agent can tell it from a settled wiki page.
+            results.append(
+                {
+                    "file": "inbox",
+                    "path": f"inbox:{record.get('id', path.stem)}",
+                    "content": f"[inbox] {title}\n{content}",
+                    "score": score,
+                }
+            )
+        return results
 
     def write(self, title: str, content: str, category: str = "general") -> str:
         """
@@ -263,9 +304,16 @@ class LLMWikiAdapter:
         query: str,
         scope: str = "all",
         top_k: int = 10,
+        include_inbox: bool = True,
     ) -> list[MemoryResult]:
-        """Search wiki using index.md and grep."""
+        """Search wiki pages (index.md + wiki/) and, by default, pending inbox."""
         results = self.wiki.search(query, top_k)
+        if include_inbox:
+            results = results + self.wiki.search_inbox(query)
+
+        # Same scoring scale for both sources; merged results sort by score.
+        results.sort(key=lambda x: x["score"], reverse=True)
+        results = results[:top_k]
 
         memory_results = []
         for r in results:
