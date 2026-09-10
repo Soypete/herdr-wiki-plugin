@@ -85,8 +85,12 @@ The ready-to-paste block is in [`../agent-instructions.md`](../agent-instruction
 ## The commands (all agents)
 
 ```
-wiki search <query> [--top-k N] [--json]
+wiki search <query> [--top-k N] [--no-inbox] [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link predicate:target ...]
 wiki organize
 ```
+
+Search includes pending inbox records by default (marked `inbox:` in results)
+so agents can see each other's unorganized captures; `--no-inbox` limits the
+search to settled wiki pages. Search never modifies the inbox.

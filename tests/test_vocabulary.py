@@ -1,5 +1,6 @@
 """Closed capture vocabulary: enforcement at the write boundary."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -80,3 +81,79 @@ def test_valid_capture_passes():
         "claim",
         [{"predicate": "derived_from", "target": "imported/whitepaper"}],
     )
+
+
+def test_coordination_entity_types_are_in_vocabulary():
+    vocab = load_vocabulary(STARTER)
+    assert {
+        "blocker",
+        "handoff",
+        "ack",
+        "release",
+        "contract_change",
+    } <= vocab.entity_types
+
+
+def test_coordination_link_predicates_are_in_vocabulary():
+    vocab = load_vocabulary(STARTER)
+    assert {"answers", "acknowledges", "blocks"} <= vocab.link_predicates
+
+
+def test_coordination_capture_chain_passes():
+    """A request -> decision -> ack chain using the new predicates/types."""
+    vocab = load_vocabulary(STARTER)
+    vocab.check_capture("handoff", [{"predicate": "acknowledges", "target": "req-1"}])
+    vocab.check_capture("decision", [{"predicate": "answers", "target": "handoff-1"}])
+    vocab.check_capture("ack", [{"predicate": "acknowledges", "target": "decision-1"}])
+    vocab.check_capture("blocker", [{"predicate": "blocks", "target": "task-9"}])
+
+
+def test_new_types_accepted_at_capture_write_boundary(tmp_path):
+    """Each new coordination type actually lands in the inbox via CaptureInbox."""
+    from haikei_wiki.capture import Capture, CaptureInbox
+
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    (wiki / "log.md").write_text("# Wiki Log\n")
+    inbox = CaptureInbox(wiki)
+    vocab = load_vocabulary(STARTER)
+
+    for entity_type in ("blocker", "handoff", "ack", "release", "contract_change"):
+        inbox.write(
+            Capture(title=f"t-{entity_type}", entity_type=entity_type, content="c"),
+            vocab,
+        )
+
+    landed = {json.loads(p.read_text())["entity_type"] for p in inbox.pending()}
+    assert {
+        "blocker",
+        "handoff",
+        "ack",
+        "release",
+        "contract_change",
+    } <= landed
+
+
+def test_new_predicates_accepted_at_capture_write_boundary(tmp_path):
+    from haikei_wiki.capture import Capture, CaptureInbox
+
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    (wiki / "log.md").write_text("# Wiki Log\n")
+    inbox = CaptureInbox(wiki)
+    vocab = load_vocabulary(STARTER)
+
+    capture = Capture(
+        title="request 7 acked",
+        entity_type="ack",
+        content="ack'd",
+        links=[
+            {"predicate": "answers", "target": "req-7"},
+            {"predicate": "acknowledges", "target": "handoff-7"},
+            {"predicate": "blocks", "target": "task-7"},
+        ],
+    )
+    inbox.write(capture, vocab)
+    landed = json.loads(inbox.pending()[0].read_text())
+    assert landed["entity_type"] == "ack"
+    assert landed["links"][0]["predicate"] == "answers"

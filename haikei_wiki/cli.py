@@ -5,7 +5,7 @@ inside a pane: it runs a command and reads stdout. Unlike the herdr plugin's
 search popup (a human UI), this prints results to the terminal.
 
 Usage:
-    python3 -m haikei_wiki search <query> [--top-k N] [--json]
+    python3 -m haikei_wiki search <query> [--top-k N] [--no-inbox] [--json]
     python3 -m haikei_wiki stats
     python3 -m haikei_wiki capture --title T --type T --content C [--link p:t ...]
     python3 -m haikei_wiki organize
@@ -22,9 +22,9 @@ from .organizer import OrganizerError, organize
 from .vocabulary import VocabularyViolation, load_vocabulary
 
 
-def _search(query: str, top_k: int, as_json: bool) -> int:
+def _search(query: str, top_k: int, as_json: bool, include_inbox: bool = True) -> int:
     adapter = LLMWikiAdapter(wiki_root())
-    results = adapter.search_memory(query, top_k=top_k)
+    results = adapter.search_memory(query, top_k=top_k, include_inbox=include_inbox)
     rows = [
         {
             "path": r.id,
@@ -106,6 +106,11 @@ def main(argv=None) -> int:
     p_search = sub.add_parser("search", help="search the wiki (agent-context lookup)")
     p_search.add_argument("query")
     p_search.add_argument("--top-k", type=int, default=10)
+    p_search.add_argument(
+        "--no-inbox",
+        action="store_true",
+        help="exclude pending inbox records (by default they are included)",
+    )
     p_search.add_argument("--json", action="store_true")
 
     p_stats = sub.add_parser("stats", help="wiki statistics")
@@ -121,7 +126,7 @@ def main(argv=None) -> int:
 
     args = parser.parse_args(argv)
     if args.cmd == "search":
-        return _search(args.query, args.top_k, args.json)
+        return _search(args.query, args.top_k, args.json, not args.no_inbox)
     if args.cmd == "stats":
         return _stats(args.json)
     if args.cmd == "capture":
