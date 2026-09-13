@@ -9,6 +9,7 @@ Usage:
     python3 -m haikei_wiki stats
     python3 -m haikei_wiki capture --title T --type T --content C [--link p:t ...]
     python3 -m haikei_wiki organize
+    python3 -m haikei_wiki audit [--json] [--stale-days N]
 """
 
 import argparse
@@ -16,10 +17,18 @@ import json
 import sys
 
 from .adapter import LLMWikiAdapter
+from .audit import (
+    CONF_JUDGMENT,
+    CONF_LIKELY,
+    CONF_POSSIBLY,
+    run_audit,
+)
 from .capture import Capture, CaptureInbox, wiki_root
 from .context import parse_provenance, resolve_worktree
 from .organizer import OrganizerError, organize
 from .vocabulary import VocabularyViolation, load_vocabulary
+
+_CONF_ORDER = (CONF_LIKELY, CONF_POSSIBLY, CONF_JUDGMENT)
 
 
 def _search(query: str, top_k: int, as_json: bool, include_inbox: bool = True) -> int:
@@ -99,6 +108,34 @@ def _organize() -> int:
     return 0
 
 
+def _audit(as_json: bool, stale_days: float, repo_dirs: list) -> int:
+    # Read-only: reports candidates and exits. Never modifies or deletes a page.
+    report = run_audit(wiki_root(), stale_days=stale_days, extra_repo_dirs=repo_dirs)
+    if as_json:
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        groups = report.by_confidence()
+        if not report.findings:
+            print(
+                f"no stale candidates among {report.pages_scanned} coordination pages"
+            )
+            return 0
+        print(
+            f"{len(report.findings)} candidates among {report.pages_scanned} coordination pages"
+        )
+        for conf in _CONF_ORDER:
+            items = groups.get(conf, [])
+            if not items:
+                continue
+            print(f"\n{conf}")
+            for f in items:
+                print(f"  {f.page}  [{f.check}]")
+                print(f"      {f.evidence}")
+                if f.related:
+                    print(f"      related: {f.related}")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="haikei-wiki", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -124,6 +161,24 @@ def main(argv=None) -> int:
 
     sub.add_parser("organize", help="reconcile the inbox into the wiki")
 
+    p_audit = sub.add_parser(
+        "audit",
+        help="read-only: find coordination pages that no longer describe reality",
+    )
+    p_audit.add_argument("--json", action="store_true")
+    p_audit.add_argument(
+        "--stale-days",
+        type=float,
+        default=7,
+        help="age threshold for the unresolved-claim check (default 7)",
+    )
+    p_audit.add_argument(
+        "--repo-dir",
+        action="append",
+        default=[],
+        help="extra directory to search for a repo (repeatable)",
+    )
+
     args = parser.parse_args(argv)
     if args.cmd == "search":
         return _search(args.query, args.top_k, args.json, not args.no_inbox)
@@ -133,6 +188,8 @@ def main(argv=None) -> int:
         return _capture(args)
     if args.cmd == "organize":
         return _organize()
+    if args.cmd == "audit":
+        return _audit(args.json, args.stale_days, args.repo_dir)
     parser.print_help()
     return 2
 
