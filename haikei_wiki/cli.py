@@ -10,6 +10,8 @@ Usage:
     python3 -m haikei_wiki capture --title T --type T --content C [--link p:t ...]
     python3 -m haikei_wiki organize
     python3 -m haikei_wiki audit [--json] [--stale-days N]
+    python3 -m haikei_wiki supersede <page> --by <page-or-url> [--reason "..."]
+    python3 -m haikei_wiki withdraw <page> --reason "..."
 """
 
 import argparse
@@ -27,28 +29,51 @@ from .audit import (
 from .capture import Capture, CaptureInbox, wiki_root
 from .context import parse_provenance, resolve_worktree
 from .lifecycle import (
+    LIFECYCLE_STATES,
     LifecycleError,
+    page_status,
     supersede,
     withdraw,
 )
 from .organizer import OrganizerError, organize
 from .vocabulary import VocabularyViolation, load_vocabulary
 
+# Superseded/withdrawn pages still surface in search (the history is the point)
+# but rank below current ones and are labelled so a worker sees at a glance that
+# a hit is historical.
+_STATUS_DOWNRANK = 0.5
+
 _CONF_ORDER = (CONF_LIKELY, CONF_POSSIBLY, CONF_JUDGMENT)
 
 
 def _search(query: str, top_k: int, as_json: bool, include_inbox: bool = True) -> int:
     adapter = LLMWikiAdapter(wiki_root())
-    results = adapter.search_memory(query, top_k=top_k, include_inbox=include_inbox)
-    rows = [
-        {
-            "path": r.id,
-            "source": r.source,
-            "score": round(r.score, 3),
-            "snippet": " ".join(r.content.split())[:300],
-        }
-        for r in results
-    ]
+    # Pull a wider pool so status down-ranking can reorder before we truncate:
+    # a superseded page must not displace a current one from the final top_k.
+    pool = max(top_k * 3, top_k + 10)
+    results = adapter.search_memory(query, top_k=pool, include_inbox=include_inbox)
+    rows = []
+    for r in results:
+        status = ""
+        # Only settled wiki pages carry frontmatter; inbox records do not.
+        if not r.id.startswith("inbox:") and not r.id.endswith("index.md"):
+            p = Path(r.id)
+            if p.is_file():
+                status = page_status(p)
+        score = r.score
+        if status in LIFECYCLE_STATES:
+            score *= _STATUS_DOWNRANK
+        rows.append(
+            {
+                "path": r.id,
+                "source": r.source,
+                "score": round(score, 3),
+                "snippet": " ".join(r.content.split())[:300],
+                "status": status,
+            }
+        )
+    rows.sort(key=lambda x: x["score"], reverse=True)
+    rows = rows[:top_k]
     if as_json:
         print(json.dumps({"query": query, "results": rows}, indent=2))
     else:
@@ -57,7 +82,8 @@ def _search(query: str, top_k: int, as_json: bool, include_inbox: bool = True) -
             return 1
         print(f"{len(rows)} results for {query!r}")
         for row in rows:
-            print(f"[{row['score']:.2f}] {row['path']}")
+            label = f" [{row['status']}]" if row["status"] else ""
+            print(f"[{row['score']:.2f}]{label} {row['path']}")
             print(f"    {row['snippet']}")
     return 0
 

@@ -111,7 +111,10 @@ def test_search_json_includes_inbox_with_stable_shape(tmp_path, monkeypatch, cap
     row = [r for r in data["results"] if r["path"].startswith("inbox:")]
     assert len(row) == 1
     assert row[0]["source"] == "inbox"
-    assert set(row[0].keys()) == {"path", "source", "score", "snippet"}
+    # status is "" for current/inbox records; present so a worker can tell a
+    # superseded/withdrawn hit from a current one at a glance.
+    assert set(row[0].keys()) == {"path", "source", "score", "snippet", "status"}
+    assert row[0]["status"] == ""
 
 
 def test_no_inbox_flag_excludes_pending_records(tmp_path, monkeypatch, capsys):
@@ -203,3 +206,46 @@ def test_merged_results_sorted_by_score(tmp_path, monkeypatch, capsys):
     assert scores[0] == 0.9  # title/filename match ranks above content match
     sources = {r["source"] for r in data["results"]}
     assert "inbox" in sources and "blockchain.md" in sources
+
+
+def test_search_labels_and_downranks_superseded(tmp_path, monkeypatch, capsys):
+    wiki = _isolate(tmp_path, monkeypatch)
+    wdir = wiki / "wiki"
+    wdir.mkdir()
+    # current page: filename match (0.9)
+    (wdir / "credential-delivery.md").write_text(
+        "---\ntitle: credential-delivery\ncategory: claim\ncreated: 2026-01-01T00:00:00\n---\n\n"
+        "credential delivery current body\n"
+    )
+    # superseded page: filename match (0.9 raw) but must rank below
+    (wdir / "credential-delivery-old.md").write_text(
+        "---\ntitle: credential-delivery-old\ncategory: claim\ncreated: 2026-01-01T00:00:00\n"
+        "status: superseded\nsuperseded_by: wiki/decision/d-014.md\n---\n\n"
+        "credential delivery old body\n"
+    )
+
+    rc = cli.main(["search", "credential delivery", "--json"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    data = json.loads(out)
+    by_path = {r["path"]: r for r in data["results"]}
+    cur = by_path[str(wdir / "credential-delivery.md")]
+    sup = by_path[str(wdir / "credential-delivery-old.md")]
+    assert cur["status"] == ""
+    assert sup["status"] == "superseded"
+    # superseded ranks below the current page
+    assert cur["score"] > sup["score"]
+
+
+def test_search_text_labels_superseded(tmp_path, monkeypatch, capsys):
+    wiki = _isolate(tmp_path, monkeypatch)
+    wdir = wiki / "wiki"
+    wdir.mkdir()
+    (wdir / "flarpberry.md").write_text(
+        "---\ntitle: flarpberry\ncategory: claim\ncreated: 2026-01-01T00:00:00\n"
+        "status: withdrawn\nreason: was wrong\n---\n\nflarpberry body\n"
+    )
+    rc = cli.main(["search", "flarpberry"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "[withdrawn]" in out
