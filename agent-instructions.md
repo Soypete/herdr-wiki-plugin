@@ -17,6 +17,13 @@ results to stdout, so run it and read the output.
   settled wiki pages.
 - **When you learn something durable**, capture it:
   `wiki capture --title "..." --type claim --content "..." [--link predicate:target]`
+- **Before writing code**, search for the conventions that bind the work and
+  follow the pages they return — the page is authoritative, not memory:
+  - `wiki search "package placement conventions"` — pkg/database boundary,
+    repository shape
+  - `wiki search "commit and pr shape"` — granular commits, one per PR by default
+  - `wiki search "duplicate handler implementations"` — check what is actually
+    wired before hardening it
 - **Stats:** `wiki stats`
 - **Reconcile the inbox into the graph** (usually a human does this, not you):
   `wiki organize`

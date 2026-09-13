@@ -37,6 +37,17 @@ wiki capture --title "finding" --type claim --content "..." --link derived_from:
   `wiki capture --title "..." --type claim --content "..."`.
 - Use `--json` on `search` when you need to parse results programmatically.
 
+## Conventions to read before writing code
+
+Run these three searches at the start of any task and follow the pages they
+return — the wiki page is authoritative, not your memory of it:
+
+```
+wiki search "package placement conventions"        # pkg/database boundary, repository shape
+wiki search "commit and pr shape"                  # granular commits, one per PR by default
+wiki search "duplicate handler implementations"    # check what is actually wired before hardening
+```
+
 ## Rules
 
 - `--type` and link `predicate` must come from the closed capture vocabulary
