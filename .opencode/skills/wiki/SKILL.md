@@ -1,6 +1,6 @@
 ---
 name: wiki
-description: Search and capture in the personal LLM-Wiki knowledge base. Use when the user asks to search the wiki, recall prior notes/claims/decisions, look up something previously captured, or capture a durable finding into the knowledge base.
+description: Search and capture in the personal LLM-Wiki knowledge base. Use when the user asks to search the wiki, recall prior notes/claims/decisions, or capture a durable finding into the knowledge base.
 ---
 
 # Wiki
