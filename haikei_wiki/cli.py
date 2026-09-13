@@ -15,6 +15,7 @@ Usage:
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from .adapter import LLMWikiAdapter
 from .audit import (
@@ -25,6 +26,11 @@ from .audit import (
 )
 from .capture import Capture, CaptureInbox, wiki_root
 from .context import parse_provenance, resolve_worktree
+from .lifecycle import (
+    LifecycleError,
+    supersede,
+    withdraw,
+)
 from .organizer import OrganizerError, organize
 from .vocabulary import VocabularyViolation, load_vocabulary
 
@@ -136,6 +142,31 @@ def _audit(as_json: bool, stale_days: float, repo_dirs: list) -> int:
     return 0
 
 
+def _supersede(page_path: str, by: str, reason) -> int:
+    try:
+        path = supersede(_resolve_page(page_path), by, reason)
+    except LifecycleError as e:
+        print(f"supersede: {e}", file=sys.stderr)
+        return 2
+    print(f"superseded {path}")
+    return 0
+
+
+def _withdraw(page_path: str, reason) -> int:
+    try:
+        path = withdraw(_resolve_page(page_path), reason)
+    except LifecycleError as e:
+        print(f"withdraw: {e}", file=sys.stderr)
+        return 2
+    print(f"withdrew {path}")
+    return 0
+
+
+def _resolve_page(page_path: str) -> Path:
+    p = Path(page_path)
+    return p if p.is_absolute() else wiki_root() / p
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="haikei-wiki", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -179,6 +210,21 @@ def main(argv=None) -> int:
         help="extra directory to search for a repo (repeatable)",
     )
 
+    p_super = sub.add_parser(
+        "supersede", help="mark a page superseded by another page/URL"
+    )
+    p_super.add_argument("page_path")
+    p_super.add_argument(
+        "--by", required=True, help="page path or URL that supersedes it"
+    )
+    p_super.add_argument("--reason", help="optional reason")
+
+    p_withdraw = sub.add_parser(
+        "withdraw", help="mark a page withdrawn (was wrong when written)"
+    )
+    p_withdraw.add_argument("page_path")
+    p_withdraw.add_argument("--reason", required=True)
+
     args = parser.parse_args(argv)
     if args.cmd == "search":
         return _search(args.query, args.top_k, args.json, not args.no_inbox)
@@ -190,6 +236,10 @@ def main(argv=None) -> int:
         return _organize()
     if args.cmd == "audit":
         return _audit(args.json, args.stale_days, args.repo_dir)
+    if args.cmd == "supersede":
+        return _supersede(args.page_path, args.by, args.reason)
+    if args.cmd == "withdraw":
+        return _withdraw(args.page_path, args.reason)
     parser.print_help()
     return 2
 
