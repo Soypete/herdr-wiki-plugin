@@ -27,6 +27,10 @@ results to stdout, so run it and read the output.
 - **Stats:** `wiki stats`
 - **Reconcile the inbox into the graph** (usually a human does this, not you):
   `wiki organize`
+- **Audit wiki health** (find orphans, broken links, stale inbox, unindexed
+  pages, empty pages): `wiki audit [--json] [--stale-days N]`
+- **Delete a wiki page or inbox record** (exact match required — no globbing):
+  `wiki delete page <path>` or `wiki delete inbox <id>`
 
 Rules:
 - `--type` must be one of: `claim`, `contradiction`, `decision`, `entity`,

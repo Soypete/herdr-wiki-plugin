@@ -89,8 +89,16 @@ wiki search <query> [--top-k N] [--no-inbox] [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link predicate:target ...]
 wiki organize
+wiki audit [--json] [--stale-days N]
+wiki delete page <path>
+wiki delete inbox <id>
 ```
 
 Search includes pending inbox records by default (marked `inbox:` in results)
 so agents can see each other's unorganized captures; `--no-inbox` limits the
 search to settled wiki pages. Search never modifies the inbox.
+
+`wiki audit` is read-only: scans for orphans, broken links, unindexed pages,
+empty pages, and stale inbox records. `wiki delete` requires an exact path or
+id — no glob/regex patterns — and logs all deletions in log.md. Inbox records
+are moved to `inbox/deleted/` (not permanently removed).
