@@ -9,7 +9,9 @@ Usage:
     python3 -m haikei_wiki stats
     python3 -m haikei_wiki capture --title T --type T --content C [--link p:t ...]
     python3 -m haikei_wiki organize
-    python3 -m haikei_wiki audit [--json] [--stale-days N]
+    python3 -m haikei_wiki audit [--json] [--stale-days N] [--structural]
+    python3 -m haikei_wiki delete page <path>
+    python3 -m haikei_wiki delete inbox <id>
     python3 -m haikei_wiki supersede <page> --by <page-or-url> [--reason "..."]
     python3 -m haikei_wiki withdraw <page> --reason "..."
 """
@@ -25,8 +27,10 @@ from .audit import (
     CONF_LIKELY,
     CONF_POSSIBLY,
     run_audit,
+    structural_audit,
 )
 from .capture import Capture, CaptureInbox, wiki_root
+from .cleanup import CleanupError, delete_inbox, delete_page
 from .context import parse_provenance, resolve_worktree
 from .lifecycle import (
     LIFECYCLE_STATES,
@@ -140,8 +144,63 @@ def _organize() -> int:
     return 0
 
 
-def _audit(as_json: bool, stale_days: float, repo_dirs: list) -> int:
-    # Read-only: reports candidates and exits. Never modifies or deletes a page.
+def _audit(as_json: bool, stale_days: float, repo_dirs: list, structural: bool) -> int:
+    if structural:
+        report = structural_audit(wiki_root(), stale_days=int(stale_days))
+        if as_json:
+            print(
+                json.dumps(
+                    {
+                        "orphans": report.orphans,
+                        "broken_links": [
+                            {"source": s, "target": t} for s, t in report.broken_links
+                        ],
+                        "unindexed": report.unindexed,
+                        "empty_pages": report.empty_pages,
+                        "stale_inbox": report.stale_inbox,
+                        "total_pages": report.total_pages,
+                        "total_inbox": report.total_inbox,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(
+                f"structural audit ({report.total_pages} pages, {report.total_inbox} inbox)"
+            )
+            if report.orphans:
+                print(f"\norphans ({report.total_orphans}):")
+                for p in report.orphans:
+                    print(f"  {p}")
+            if report.broken_links:
+                print(f"\nbroken links ({report.total_broken_links}):")
+                for src, tgt in report.broken_links:
+                    print(f"  {src} -> [[{tgt}]]")
+            if report.unindexed:
+                print(f"\nunindexed ({report.total_unindexed}):")
+                for p in report.unindexed:
+                    print(f"  {p}")
+            if report.empty_pages:
+                print(f"\nempty/trivial ({report.total_empty}):")
+                for p in report.empty_pages:
+                    print(f"  {p}")
+            if report.stale_inbox:
+                print(f"\nstale inbox records ({report.total_stale}):")
+                for p in report.stale_inbox:
+                    print(f"  {p}")
+            if not any(
+                [
+                    report.orphans,
+                    report.broken_links,
+                    report.unindexed,
+                    report.empty_pages,
+                    report.stale_inbox,
+                ]
+            ):
+                print("no issues found")
+        return 0
+
+    # Coordination-graph audit (default)
     report = run_audit(wiki_root(), stale_days=stale_days, extra_repo_dirs=repo_dirs)
     if as_json:
         print(json.dumps(report.to_dict(), indent=2))
@@ -165,6 +224,25 @@ def _audit(as_json: bool, stale_days: float, repo_dirs: list) -> int:
                 print(f"      {f.evidence}")
                 if f.related:
                     print(f"      related: {f.related}")
+    return 0
+
+
+def _delete(args) -> int:
+    if args.delete_target == "page":
+        result = delete_page(page_spec=args.spec)
+    elif args.delete_target == "inbox":
+        result = delete_inbox(inbox_spec=args.spec)
+    else:
+        print(f"unknown delete target: {args.delete_target}", file=sys.stderr)
+        return 2
+
+    if result.error:
+        print(f"ERROR: {result.error}", file=sys.stderr)
+        return 1
+    if result.deleted_page:
+        print(f"deleted page: {result.deleted_page}")
+    if result.deleted_inbox:
+        print(f"deleted inbox record: {result.deleted_inbox}")
     return 0
 
 
@@ -235,6 +313,19 @@ def main(argv=None) -> int:
         default=[],
         help="extra directory to search for a repo (repeatable)",
     )
+    p_audit.add_argument(
+        "--structural",
+        action="store_true",
+        help="run structural audit (orphans, broken links, unindexed, etc.) instead",
+    )
+
+    p_del = sub.add_parser("delete", help="delete a wiki page or inbox record")
+    p_del.add_argument(
+        "delete_target",
+        choices=["page", "inbox"],
+        help="what to delete: 'page' or 'inbox'",
+    )
+    p_del.add_argument("spec", help="exact page path or inbox record id")
 
     p_super = sub.add_parser(
         "supersede", help="mark a page superseded by another page/URL"
@@ -261,7 +352,9 @@ def main(argv=None) -> int:
     if args.cmd == "organize":
         return _organize()
     if args.cmd == "audit":
-        return _audit(args.json, args.stale_days, args.repo_dir)
+        return _audit(args.json, args.stale_days, args.repo_dir, args.structural)
+    if args.cmd == "delete":
+        return _delete(args)
     if args.cmd == "supersede":
         return _supersede(args.page_path, args.by, args.reason)
     if args.cmd == "withdraw":

@@ -16,6 +16,9 @@ wiki search <query> [--top-k N] [--no-inbox] [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link predicate:target ...]
 wiki organize
+wiki audit [--json] [--stale-days N]
+wiki delete page <path>
+wiki delete inbox <id>
 ```
 
 ## Examples
@@ -27,6 +30,10 @@ wiki search whitepaper --json
 wiki search coord/claim --no-inbox
 wiki stats
 wiki capture --title "finding" --type claim --content "..." --link derived_from:imported/whitepaper
+wiki audit
+wiki audit --json
+wiki delete page wiki/claim/indexed-retrieval-wins.md
+wiki delete inbox rec-1
 ```
 
 ## How to use it
@@ -47,6 +54,9 @@ wiki search "package placement conventions"        # pkg/database boundary, repo
 wiki search "commit and pr shape"                  # granular commits, one per PR by default
 wiki search "duplicate handler implementations"    # check what is actually wired before hardening
 ```
+
+- Delete requires an exact path or id — no glob/regex patterns. Deletions
+  are logged in log.md; inbox records are moved to inbox/deleted/.
 
 ## Rules
 

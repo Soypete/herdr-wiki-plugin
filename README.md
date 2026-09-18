@@ -113,6 +113,9 @@ wiki search <query> [--top-k N] [--no-inbox] [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link p:t ...]
 wiki organize
+wiki audit [--json] [--stale-days N]
+wiki delete page <path>
+wiki delete inbox <id>
 ```
 
 ### Per-agent skills
@@ -158,6 +161,30 @@ You have a `wiki` command for a personal LLM-Wiki knowledge base.
   contradicts, supports, about, relates_to, answers, acknowledges, blocks}.
 - Captures land in an inbox; do not edit wiki pages directly. Search never
   changes the inbox — only a human's `wiki organize` does.
+```
+
+### Audit: find structural issues
+
+`wiki audit` scans the wiki for orphans (pages with no inbound links), broken
+wikilinks, unindexed pages, empty/trivial pages, and stale inbox records. It
+is read-only — it never mutates the wiki or inbox.
+
+```
+wiki audit
+wiki audit --json
+wiki audit --stale-days 14
+```
+
+### Delete: remove a page or inbox record (exact match only)
+
+`wiki delete` removes an exact wiki page or inbox record. Safety:
+- Requires an exact path or id — no glob/regex patterns.
+- All deletions are logged in `log.md`.
+- Inbox records are moved to `inbox/deleted/` (not permanently removed).
+
+```
+wiki delete page wiki/claim/indexed-retrieval-wins.md
+wiki delete inbox rec-1
 ```
 
 This needs no skill/plugin mechanism — the agent sees the commands in its
@@ -217,11 +244,13 @@ agent-instructions.md    # paste-me block for CLAUDE.md / AGENTS.md
 bin/                     # thin entrypoints Herdr launches
   wiki                   # agent-facing CLI launcher (symlink onto PATH)
 haikei_wiki/             # the logic package (testable)
-  cli.py                 # agent-context CLI (search/stats/capture/organize)
+  cli.py                 # agent-context CLI (search/stats/capture/organize/audit/delete)
   vocabulary.py          # closed-vocabulary loader + write-boundary checks
   context.py             # HERDR_PLUGIN_CONTEXT_JSON -> provenance
   capture.py             # atomic inbox writer + log append
   organizer.py           # single-writer inbox -> wiki reconciliation
+  audit.py               # read-only structural audit (orphans, broken links, …)
+  cleanup.py             # safe, exact-selection delete of pages or inbox records
   herdr.py               # $HERDR_BIN_PATH helper
   adapter.py             # vendored LLMWikiAdapter (storage layer)
   interfaces.py          # vendored shared dataclasses
@@ -230,7 +259,7 @@ haikei_wiki/             # the logic package (testable)
 skills/                  # skills for other agents
   claude/wiki/SKILL.md   # Claude Code skill
   codex/                 # Codex plugin + local marketplace
-tests/                   # pytest suite (34 tests)
+tests/                   # pytest suite
 ```
 
 ## Development

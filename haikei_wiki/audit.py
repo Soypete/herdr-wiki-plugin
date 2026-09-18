@@ -1109,3 +1109,159 @@ def run_audit(
     order = {CONF_LIKELY: 0, CONF_POSSIBLY: 1, CONF_JUDGMENT: 2}
     findings.sort(key=lambda f: (order.get(f.confidence, 3), f.page, f.check))
     return AuditReport(findings=findings, pages_scanned=len(pages), checks=checks)
+
+# ======================================================================
+# Structural audit: orphans, broken links, unindexed, empty, stale inbox
+# ======================================================================
+
+import time as _time
+
+from .capture import wiki_root as _wiki_root
+
+
+@dataclass
+class StructuralReport:
+    """Report from a structural wiki audit."""
+    orphans: list[str] = field(default_factory=list)
+    broken_links: list[tuple[str, str]] = field(default_factory=list)
+    unindexed: list[str] = field(default_factory=list)
+    empty_pages: list[str] = field(default_factory=list)
+    stale_inbox: list[str] = field(default_factory=list)
+    total_pages: int = 0
+    total_inbox: int = 0
+    total_orphans: int = 0
+    total_broken_links: int = 0
+    total_unindexed: int = 0
+    total_empty: int = 0
+    total_stale: int = 0
+
+
+def structural_audit(
+    wiki_path: Optional[Path] = None, stale_days: int = 7
+) -> StructuralReport:
+    """Scan the wiki for structural issues (orphans, broken links, etc).
+
+    Read-only — never mutates the wiki, the inbox, or the index.
+    """
+    wiki = Path(wiki_path) if wiki_path else _wiki_root()
+    wiki_dir = wiki / "wiki"
+    index_file = wiki / "index.md"
+    inbox_dir = wiki / "inbox"
+
+    report = StructuralReport()
+
+    # --- collect all wiki pages ---
+    all_pages: list[Path] = []
+    if wiki_dir.exists():
+        all_pages = sorted(wiki_dir.rglob("*.md"))
+    report.total_pages = len(all_pages)
+
+    # --- parse index.md for linked entries ---
+    indexed_refs: set[str] = set()
+    if index_file.exists():
+        for m in re.finditer(r"\[\[([^\]]+)\]\]", index_file.read_text()):
+            indexed_refs.add(m.group(1))
+
+    # --- first pass: collect all wikilinks from all pages ---
+    page_paths: set[str] = set()
+    page_refs: set[str] = set()
+    for md in all_pages:
+        rel = md.relative_to(wiki).as_posix()
+        page_paths.add(str(md))
+        page_paths.add(rel)
+        if md.parent != wiki_dir:
+            cat = md.parent.name
+            page_refs.add(f"{cat}/{md.stem}")
+        page_refs.add(md.stem)
+
+    inbound_links: dict[str, int] = {}
+    link_graph: dict[str, list[str]] = {}
+
+    for md in all_pages:
+        content = md.read_text()
+        rel = md.relative_to(wiki).as_posix()
+        links = re.findall(r"\[\[([^\]|]+)\|?[^\]]*\]\]", content)
+        resolved = []
+        for raw_target in links:
+            target = raw_target.strip()
+            resolved.append(target)
+            inbound_links.setdefault(target, 0)
+            inbound_links[target] += 1
+        link_graph[rel] = resolved
+
+    # --- orphans: pages with no inbound links from other wiki pages ---
+    for md in all_pages:
+        rel = md.relative_to(wiki).as_posix()
+        cat = md.parent.name if md.parent != wiki_dir else "general"
+        refs = [f"{cat}/{md.stem}", md.stem, rel]
+        has_inbound = any(inbound_links.get(r, 0) > 0 for r in refs)
+        if not has_inbound:
+            for src_md in all_pages:
+                if src_md == md:
+                    continue
+                src_content = src_md.read_text()
+                if rel in src_content or md.stem in src_content:
+                    has_inbound = True
+                    break
+        if not has_inbound:
+            report.orphans.append(rel)
+    report.total_orphans = len(report.orphans)
+
+    # --- broken links: wikilinks targeting non-existent pages ---
+    handled = set()
+    for src_rel, targets in link_graph.items():
+        for t in targets:
+            key = (src_rel, t)
+            if key in handled:
+                continue
+            handled.add(key)
+            t = t.strip()
+            exists = False
+            if t in page_paths or t in page_refs:
+                exists = True
+            else:
+                check_path = wiki / t
+                if check_path.exists() or check_path.with_suffix(".md").exists():
+                    exists = True
+                else:
+                    for md in all_pages:
+                        if md.stem == t or md.stem == t.rstrip(".md"):
+                            exists = True
+                            break
+            if not exists:
+                report.broken_links.append((src_rel, t))
+    report.total_broken_links = len(report.broken_links)
+
+    # --- unindexed: pages not listed in index.md ---
+    for md in all_pages:
+        rel = md.relative_to(wiki).as_posix()
+        cat = md.parent.name if md.parent != wiki_dir else "general"
+        ref = f"{cat}/{md.stem}"
+        if ref not in indexed_refs and rel not in indexed_refs:
+            report.unindexed.append(rel)
+    report.total_unindexed = len(report.unindexed)
+
+    # --- empty / trivial pages ---
+    for md in all_pages:
+        content = md.read_text()
+        body = re.sub(r"^---\n.*?\n---\n", "", content, count=1, flags=re.DOTALL)
+        body = body.strip()
+        if not body or len(body) < 20:
+            report.empty_pages.append(md.relative_to(wiki).as_posix())
+    report.total_empty = len(report.empty_pages)
+
+    # --- stale inbox records ---
+    if inbox_dir.exists():
+        now = _time.time()
+        for f in sorted(inbox_dir.glob("*.json")):
+            try:
+                age_seconds = now - f.stat().st_mtime
+            except OSError:
+                continue
+            age_days = age_seconds / 86400
+            if age_days >= stale_days:
+                report.stale_inbox.append(f.name)
+        report.total_stale = len(report.stale_inbox)
+        report.total_inbox = len(list(inbox_dir.glob("*.json")))
+
+    return report
