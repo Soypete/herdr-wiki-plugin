@@ -16,9 +16,11 @@ wiki search <query> [--top-k N] [--no-inbox] [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link predicate:target ...]
 wiki organize
-wiki audit [--json] [--stale-days N]
+wiki audit [--json] [--stale-days N] [--structural]
 wiki delete page <path>
 wiki delete inbox <id>
+wiki supersede <page> --by <page-or-url> [--reason "..."]
+wiki withdraw <page> --reason "..."
 ```
 
 ## Examples
@@ -32,8 +34,11 @@ wiki stats
 wiki capture --title "finding" --type claim --content "..." --link derived_from:imported/whitepaper
 wiki audit
 wiki audit --json
+wiki audit --structural
 wiki delete page wiki/claim/indexed-retrieval-wins.md
 wiki delete inbox rec-1
+wiki supersede wiki/claim/old-approach.md --by wiki/claim/new-approach.md --reason "replaced by new approach"
+wiki withdraw wiki/claim/retracted.md --reason "was wrong when written"
 ```
 
 ## How to use it

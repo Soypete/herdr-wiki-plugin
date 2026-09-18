@@ -113,9 +113,11 @@ wiki search <query> [--top-k N] [--no-inbox] [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link p:t ...]
 wiki organize
-wiki audit [--json] [--stale-days N]
+wiki audit [--json] [--stale-days N] [--structural]
 wiki delete page <path>
 wiki delete inbox <id>
+wiki supersede <page> --by <page-or-url> [--reason "..."]
+wiki withdraw <page> --reason "..."
 ```
 
 ### Per-agent skills
@@ -163,16 +165,38 @@ You have a `wiki` command for a personal LLM-Wiki knowledge base.
   changes the inbox — only a human's `wiki organize` does.
 ```
 
-### Audit: find structural issues
+### Audit: find stale coordination pages or structural issues
 
-`wiki audit` scans the wiki for orphans (pages with no inbound links), broken
-wikilinks, unindexed pages, empty/trivial pages, and stale inbox records. It
-is read-only — it never mutates the wiki or inbox.
+`wiki audit` runs in two modes:
+
+- **Coordination-graph audit** (default): finds pages that no longer describe
+  reality — dead citations, dead git branches, merged PRs, unresolved old
+  claims, resolved blockers, contradictions. Requires `gh` for PR checks.
+- **Structural audit** (`--structural`): scans for orphans (pages with no
+  inbound links), broken wikilinks, unindexed pages, empty/trivial pages, and
+  stale inbox records.
+
+Both modes are read-only — they never mutate the wiki or inbox.
 
 ```
 wiki audit
 wiki audit --json
 wiki audit --stale-days 14
+wiki audit --structural
+wiki audit --structural --json
+```
+
+### Page lifecycle: supersede and withdraw
+
+Mark a page as superseded (its content is replaced by another page or URL) or
+withdrawn (it was wrong when written). Superseded/withdrawn pages still appear
+in search but are downranked and labelled.
+
+```
+wiki supersede wiki/claim/old.md --by wiki/claim/new.md --reason "replaced by newer analysis"
+wiki supersede wiki/claim/old.md --by https://example.com/new-research --reason "external source has the latest"
+
+wiki withdraw wiki/claim/retracted.md --reason "the referenced study was retracted"
 ```
 
 ### Delete: remove a page or inbox record (exact match only)
@@ -244,13 +268,14 @@ agent-instructions.md    # paste-me block for CLAUDE.md / AGENTS.md
 bin/                     # thin entrypoints Herdr launches
   wiki                   # agent-facing CLI launcher (symlink onto PATH)
 haikei_wiki/             # the logic package (testable)
-  cli.py                 # agent-context CLI (search/stats/capture/organize/audit/delete)
+  cli.py                 # agent-context CLI (search/stats/capture/organize/audit/delete/supersede/withdraw)
   vocabulary.py          # closed-vocabulary loader + write-boundary checks
   context.py             # HERDR_PLUGIN_CONTEXT_JSON -> provenance
   capture.py             # atomic inbox writer + log append
   organizer.py           # single-writer inbox -> wiki reconciliation
-  audit.py               # read-only structural audit (orphans, broken links, …)
+  audit.py               # coordination-graph + structural audit (read-only)
   cleanup.py             # safe, exact-selection delete of pages or inbox records
+  lifecycle.py           # supersede / withdraw page-lifecycle commands
   herdr.py               # $HERDR_BIN_PATH helper
   adapter.py             # vendored LLMWikiAdapter (storage layer)
   interfaces.py          # vendored shared dataclasses

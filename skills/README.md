@@ -89,16 +89,21 @@ wiki search <query> [--top-k N] [--no-inbox] [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link predicate:target ...]
 wiki organize
-wiki audit [--json] [--stale-days N]
+wiki audit [--json] [--stale-days N] [--structural]
 wiki delete page <path>
 wiki delete inbox <id>
+wiki supersede <page> --by <page-or-url> [--reason "..."]
+wiki withdraw <page> --reason "..."
 ```
 
 Search includes pending inbox records by default (marked `inbox:` in results)
 so agents can see each other's unorganized captures; `--no-inbox` limits the
 search to settled wiki pages. Search never modifies the inbox.
 
-`wiki audit` is read-only: scans for orphans, broken links, unindexed pages,
-empty pages, and stale inbox records. `wiki delete` requires an exact path or
-id — no glob/regex patterns — and logs all deletions in log.md. Inbox records
-are moved to `inbox/deleted/` (not permanently removed).
+`wiki audit` runs in two modes: coordination-graph (default, finds stale
+coordination pages) and `--structural` (orphans, broken links, unindexed,
+empty, stale inbox). Both are read-only. `wiki delete` requires an exact path
+or id — no glob/regex patterns — and logs all deletions in log.md. Inbox
+records are moved to `inbox/deleted/` (not permanently removed). `wiki
+supersede` and `wiki withdraw` mark page-lifecycle status; superseded/withdrawn
+pages still surface in search but are downranked and labelled.

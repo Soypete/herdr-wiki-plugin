@@ -27,10 +27,16 @@ results to stdout, so run it and read the output.
 - **Stats:** `wiki stats`
 - **Reconcile the inbox into the graph** (usually a human does this, not you):
   `wiki organize`
-- **Audit wiki health** (find orphans, broken links, stale inbox, unindexed
-  pages, empty pages): `wiki audit [--json] [--stale-days N]`
+- **Audit wiki health**: coordination-graph audit (stale claims, dead
+  branches, merged PRs) or structural audit (orphans, broken links, stale
+  inbox, unindexed, empty pages):
+  `wiki audit [--json] [--stale-days N]` or `wiki audit --structural`
 - **Delete a wiki page or inbox record** (exact match required — no globbing):
   `wiki delete page <path>` or `wiki delete inbox <id>`
+- **Supersede a page** when its content is superseded by another page/URL:
+  `wiki supersede <page> --by <page-or-url> [--reason "..."]`
+- **Withdraw a page** when it was wrong when written:
+  `wiki withdraw <page> --reason "..."`
 
 Rules:
 - `--type` must be one of: `claim`, `contradiction`, `decision`, `entity`,
