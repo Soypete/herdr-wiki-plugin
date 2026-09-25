@@ -70,5 +70,5 @@ wiki search "duplicate handler implementations"    # check what is actually wire
   `--no-inbox` to see only settled pages. Search never modifies the inbox.
 - Captures land in an inbox; a human runs `wiki organize` to fold them into
   the interlinked graph. Do not edit wiki pages directly.
-- If `wiki` is not on PATH, run the launcher from the plugin repo:
-  `python3 /path/to/herdr-wiki-plugin/bin/wiki <args>`.
+- If `wiki` is not on PATH, run the shell launcher directly from the plugin repo:
+  `/path/to/herdr-wiki-plugin/bin/wiki <args>`.
