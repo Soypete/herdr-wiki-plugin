@@ -1,0 +1,23 @@
+{
+  "skill_name": "wiki",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Search the wiki for the current runtime setup decision. Use the wiki skill and report the relevant decision title and one-sentence conclusion. Do not read inbox JSON files directly.",
+      "expected_output": "Uses the wiki search workflow and reports a grounded result without invoking Python on bin/wiki or opening inbox files.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Capture a durable claim that the runtime setup flow must be documented as harness -> runtime installation -> runtime credential. Use the wiki skill, the allowed capture vocabulary, and do not edit wiki pages or JSON registries.",
+      "expected_output": "Uses wiki capture with a valid type and leaves the graph organization step to a human; no direct inbox or registry edits.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "The wiki audit reports a stale pedro-tag reference. Search for the reference and explain the blocker without modifying historical wiki pages or inbox records.",
+      "expected_output": "Uses wiki search, reports the stale-reference tooling blocker, and does not delete or edit historical records.",
+      "files": []
+    }
+  ]
+}

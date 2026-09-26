@@ -41,4 +41,4 @@ Rules:
 - Captures land in an inbox; do **not** edit wiki pages directly. Search is
   read-only on the inbox — only a human's `wiki organize` changes it.
 - If `wiki` is not on PATH, run
-  `python3 /path/to/herdr-wiki-plugin/bin/wiki <args>`.
+  `/path/to/herdr-wiki-plugin/bin/wiki <args>`.
