@@ -267,3 +267,49 @@ def test_run_audit_recent_claims_not_flaggged(tmp_path):
     report = run_audit(wiki, stale_days=7, extra_repo_dirs=[])
     unresolved = [f for f in report.findings if f.check == "unresolved_claim"]
     assert len(unresolved) == 0
+
+
+# --- citation resolution with unknown / known repo aliases ---
+
+
+def test_run_audit_unknown_repo_alias_does_not_crash(tmp_path):
+    """A page whose text names a repo alias not present in the repos dict
+    should produce a dead_citation finding instead of crashing with KeyError."""
+    wiki = tmp_path / "wik"
+    wiki.mkdir()
+    wd = wiki / "wiki"
+    wd.mkdir()
+    _make_page(
+        wd / "decision" / "stale.md",
+        "stale",
+        "See cmd/server/main.go:42 in pedro-tag repo.",
+        category="decision",
+    )
+    report = run_audit(wiki, stale_days=7, repos={})
+    assert len(report.findings) >= 1
+    assert any(
+        f.check == "dead_citation" and "unknown repo" in f.evidence
+        for f in report.findings
+    )
+
+
+def test_run_audit_known_repo_no_false_unknown(tmp_path):
+    """A page citing a file in a known, present repo should NOT produce an
+    unknown-repo finding.  The audit may still flag a dead citation if the
+    file is genuinely missing, but the alias itself must be accepted."""
+    wiki = tmp_path / "wik"
+    wiki.mkdir()
+    wd = wiki / "wiki"
+    wd.mkdir()
+    repo_root = _git_repo(
+        tmp_path, "kei", files={"cmd/server/main.go": "package main\nfunc main() {}\n"}
+    )
+    _make_page(
+        wd / "decision" / "ok.md",
+        "ok",
+        "See cmd/server/main.go:42 in kei repo.",
+        category="decision",
+    )
+    report = run_audit(wiki, stale_days=7, repos={"kei": repo_root})
+    unknown = [f for f in report.findings if "unknown repo" in f.evidence]
+    assert len(unknown) == 0

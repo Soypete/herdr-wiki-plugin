@@ -438,6 +438,8 @@ def _resolve_file(repos: dict, cite_path: str, page_text: str):
         tok = _repo_name_tokens(page_text)
         if len(tok) == 1:
             name = next(iter(tok))
+            if name not in repos:
+                return None
             return (name, repos[name] / cite_path)
         return None
     # path has a directory but is not found at the repo root: pages often cite
@@ -463,6 +465,8 @@ def _resolve_file(repos: dict, cite_path: str, page_text: str):
     tok = _repo_name_tokens(page_text)
     if len(tok) == 1:
         name = next(iter(tok))
+        if name not in repos:
+            return None
         return (name, repos[name] / cite_path)
     return None
 
@@ -478,6 +482,20 @@ def _check_dead_citation(page: Path, text: str, repos: dict):
         lo, hi = _span(m.group(2))
         resolved = _resolve_file(repos, cite_path, text)
         if resolved is None:
+            # Check whether resolution failed because the page names a
+            # repo alias that is not available locally.
+            tok = _repo_name_tokens(text)
+            unknown = [t for t in tok if t not in repos]
+            if unknown:
+                findings.append(
+                    Finding(
+                        _rel(page.parent.parent.parent, page),
+                        page.parent.name,
+                        "dead_citation",
+                        CONF_LIKELY,
+                        f"{cite_path} references unknown repo '{unknown[0]}'",
+                    )
+                )
             continue
         repo_name, repo_file = resolved
         if not repo_file.exists():
