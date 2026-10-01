@@ -1,0 +1,109 @@
+{
+  "harness": "opencode",
+  "model": "deepseek-ai/DeepSeek-V4-Flash",
+  "created_at": "2026-10-01T17:52:44.518Z",
+  "results": [
+    {
+      "skill": "herdr-orchestrator",
+      "id": 1,
+      "config": "with_skill",
+      "passed": 3,
+      "failed": 1,
+      "total": 4,
+      "pass_rate": 0.75
+    },
+    {
+      "skill": "herdr-orchestrator",
+      "id": 1,
+      "config": "without_skill",
+      "passed": 2,
+      "failed": 2,
+      "total": 4,
+      "pass_rate": 0.5
+    },
+    {
+      "skill": "herdr-orchestrator",
+      "id": 2,
+      "config": "with_skill",
+      "passed": 4,
+      "failed": 0,
+      "total": 4,
+      "pass_rate": 1
+    },
+    {
+      "skill": "herdr-orchestrator",
+      "id": 2,
+      "config": "without_skill",
+      "passed": 0,
+      "failed": 0,
+      "total": 0,
+      "error": "\u001b[91m\u001b[1mError: \u001b[0mThe user rejected permission to use this specific tool call."
+    },
+    {
+      "skill": "herdr-orchestrator",
+      "id": 3,
+      "config": "with_skill",
+      "passed": 3,
+      "failed": 1,
+      "total": 4,
+      "pass_rate": 0.75
+    },
+    {
+      "skill": "herdr-orchestrator",
+      "id": 3,
+      "config": "without_skill",
+      "passed": 0,
+      "failed": 4,
+      "total": 4,
+      "pass_rate": 0
+    },
+    {
+      "skill": "herdr-orchestrator",
+      "id": 4,
+      "config": "with_skill",
+      "passed": 2,
+      "failed": 1,
+      "total": 3,
+      "pass_rate": 0.6666666666666666
+    },
+    {
+      "skill": "herdr-orchestrator",
+      "id": 4,
+      "config": "without_skill",
+      "passed": 1,
+      "failed": 2,
+      "total": 3,
+      "pass_rate": 0.3333333333333333
+    },
+    {
+      "skill": "herdr-orchestrator",
+      "id": 5,
+      "config": "with_skill",
+      "passed": 4,
+      "failed": 0,
+      "total": 4,
+      "pass_rate": 1
+    },
+    {
+      "skill": "herdr-orchestrator",
+      "id": 5,
+      "config": "without_skill",
+      "passed": 1,
+      "failed": 3,
+      "total": 4,
+      "pass_rate": 0.25
+    }
+  ],
+  "by_skill": {
+    "herdr-orchestrator": {
+      "with_skill": {
+        "passed": 16,
+        "total": 19
+      },
+      "without_skill": {
+        "passed": 4,
+        "total": 15
+      }
+    }
+  }
+}

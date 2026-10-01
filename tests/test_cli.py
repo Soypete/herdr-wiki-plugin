@@ -70,9 +70,12 @@ def test_opencode_skill_present_with_required_frontmatter():
     assert re.search(r"^description: .+", fm, re.M), "frontmatter must set description"
 
 
-def test_opencode_config_allows_only_the_wiki_skill():
+def test_opencode_config_allows_expected_skills():
     cfg = json.loads((ROOT / "opencode.json").read_text())
     skills = cfg.get("permission", {}).get("skill", {})
     assert skills.get("wiki") == "allow", "permission.skill.wiki must be 'allow'"
+    assert skills.get("herdr-orchestrator") == "allow", (
+        "permission.skill.herdr-orchestrator must be 'allow'"
+    )
     # minimal + scoped: no unrelated skill permissions are introduced
-    assert set(skills) == {"wiki"}
+    assert set(skills) == {"wiki", "herdr-orchestrator"}

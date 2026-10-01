@@ -1,0 +1,59 @@
+{
+  "skill_name": "herdr-orchestrator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Decompose this goal into worker tasks: add a dark mode toggle to a React app. List the tasks with their dependencies, worker kind, and whether they can run in parallel or need a stack.",
+      "expectations": [
+        "Produces 2-3 tasks with clear dependency ordering",
+        "Task names match [a-z][a-z0-9_-]",
+        "Identifies which tasks can run in parallel vs need a stack",
+        "Assigns a worker kind to each task"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "A worker has been BLOCKED for 6 minutes showing an 'are you sure?' prompt after the unit tests all passed. Read the plan, determine the state, and decide what to do. The plan says: 'task auth-api: add token refresh endpoint, worker: codex, depends on nothing'.",
+      "expectations": [
+        "Identifies the worker state as BLOCKED",
+        "Plans to read the pane content first",
+        "Either answers the approval question or escalates to the user",
+        "Does not nudge a worker that is idle/done"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "A worker's task failed three times. First attempt: test failure. Second attempt: wrong file scope. Third attempt: test failure again. What do you do now?",
+      "expectations": [
+        "Recognizes that three strikes have been reached",
+        "Captures a wiki blocker with what was tried and why it failed",
+        "Links the blocker to the task decision",
+        "Escalates to the user instead of trying a fourth time"
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "You are orchestrating two workers: one adding a backend migration (migration 042), another adding an unrelated feature (migration 043). Both PRs are open. The user asks 'can I merge these?' What do you tell them?",
+      "expectations": [
+        "States an explicit merge order by migration number (042 before 043)",
+        "Warns about the CI guard and renumbering risk if the higher one merges first",
+        "Does not say 'merge anytime'"
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "A worker reports that its PR is ready and tests pass. Walk through what you do to verify. The orchestrator may not write code.",
+      "expectations": [
+        "Uses gh pr view to check PR state and base branch",
+        "Runs the test command in a scratch pane instead of taking the worker's word",
+        "Checks the wiki for a handoff capture",
+        "Does not merge or ask the worker to merge"
+      ],
+      "files": []
+    }
+  ]
+}
