@@ -42,6 +42,16 @@ Read the base herdr skill if it's installed; it owns exact command syntax and sa
 
 ## The loop
 
+### Keep the wiki protocol active in Claude Code
+
+In Claude Code, use `/plan` before dispatching a multi-worker effort and `/loop` for recurring orchestration ticks. These commands provide a useful cadence for applying the protocol; they do not replace the wiki or the steps below. In Codex and opencode, use the equivalent planning and recurring-check mechanism available in that harness.
+
+- **In `/plan`:** search the wiki before decomposing the goal. Make the task graph, owners, dependencies, and relevant existing decisions explicit. Require each worker brief to name the wiki searches it must run and the durable records it must capture or acknowledge. Capture the resulting plan as a wiki `decision` before dispatch.
+- **In every `/loop` tick:** search for new claims, decisions, blockers, and `contract_change` captures since the previous tick. Compare them with active worker scopes and PR stacks. Prompt affected workers to read relevant changes and capture an `ack` when an interface contract changed. Check progress and PR dependencies, update the plan when needed, and record durable changes in the wiki. Do not treat a loop tick as a status poll: it should apply new coordination information to active work.
+- **When work is idle or waiting:** keep the loop focused on actionable changes and review dependencies. Do not repeatedly wake workers or emit routine status when there is no new information.
+
+The same discipline applies if `/plan` or `/loop` is unavailable: explicitly run the planning and recurring wiki checks described here. The commands help the orchestrator remember the cadence; the searchable wiki is what lets other sessions recover the decisions.
+
 ### 1. Understand and search
 
 Before planning, find out what already exists:
