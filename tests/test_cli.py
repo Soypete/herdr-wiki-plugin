@@ -77,5 +77,8 @@ def test_opencode_config_allows_expected_skills():
     assert skills.get("herdr-orchestrator") == "allow", (
         "permission.skill.herdr-orchestrator must be 'allow'"
     )
+    assert skills.get("worker-git-identity") == "allow", (
+        "permission.skill.worker-git-identity must be 'allow'"
+    )
     # minimal + scoped: no unrelated skill permissions are introduced
-    assert set(skills) == {"wiki", "herdr-orchestrator"}
+    assert set(skills) == {"wiki", "herdr-orchestrator", "worker-git-identity"}

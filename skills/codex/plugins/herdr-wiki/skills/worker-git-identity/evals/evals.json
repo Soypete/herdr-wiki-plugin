@@ -1,0 +1,71 @@
+{
+  "skill_name": "worker-git-identity",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm a herdr worker in a linked worktree of acme/api on branch feat/login-retry. Our bot account is acme-swarm-bot and its gh wrapper is called bot-gh. My one commit is done. Give me the exact shell commands to push the branch and open a draft PR as the bot, not as the owner.",
+      "expectations": [
+        "Runs gh through the bot-gh wrapper rather than plain gh",
+        "Pushes to https://github.com/acme/api.git, not an SSH remote",
+        "Uses an empty credential.helper followed by '!bot-gh auth git-credential'",
+        "Sets GIT_CONFIG_GLOBAL=/dev/null and GIT_TERMINAL_PROMPT=0 for the push",
+        "Opens the PR with bot-gh pr create --draft and checks the author afterwards"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "A worker push to acme/web fails with HTTP 403: 'Permission to acme/web.git denied to acme-swarm-bot.' But bot-gh api repos/acme/web --jq .permissions.push prints true. What is wrong and who fixes it?",
+      "expectations": [
+        "Attributes the failure to the fine-grained token, not the team membership",
+        "Names the Contents read and write permission or the token's repository list",
+        "Says the owner edits the token and the agent does not work around it"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Yesterday I ran gh auth login with the bot's token under GH_CONFIG_DIR=~/.config/gh-bot so workers could use it. Today my own gh api user prints the bot's login and my private repos 404 in other terminals. What happened, and how should the bot's auth be set up instead?",
+      "expectations": [
+        "Identifies the shared macOS keyring slot (gh:github.com) as the cause",
+        "Says GH_CONFIG_DIR does not isolate the stored token",
+        "Logs the bot out with gh auth logout and has the owner log back in",
+        "Moves the bot to GH_TOKEN via the wrapper and an owner-written 0600 token file"
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Every time my worker pushes to https://github.com/acme/api, my password manager pops up asking me to approve an SSH key, and the push ends up attributed to me. I'm definitely typing an https URL. Why?",
+      "expectations": [
+        "Identifies a global url insteadOf rewrite from HTTPS to SSH as the cause",
+        "Disables the global config with GIT_CONFIG_GLOBAL=/dev/null",
+        "Uses the wrapper as the credential helper for the HTTPS push",
+        "Suggests git ls-remote --get-url to confirm the rewrite"
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "I set git config --local user.name acme-swarm-bot in my herdr worker's worktree and now the other workers' worktrees of the same repo commit as the bot too. Why, and what should I have done?",
+      "expectations": [
+        "Explains that --local in a linked worktree writes the shared .git/config",
+        "Removes the identity from the shared config",
+        "Uses git config --worktree when extensions.worktreeConfig is on, or per-commit -c user.name/-c user.email otherwise",
+        "Does not suggest --global"
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "How do I check whether the bot token behind bot-gh is still valid and when it expires? Can I just cat the token file and compare it with the one in my password manager?",
+      "expectations": [
+        "Checks the login with bot-gh api user",
+        "Reads the expiry from the github-authentication-token-expiration response header",
+        "Refuses to cat, print or reveal the token; at most ls -l the file for its mode",
+        "Says rotation is done by the owner, who rewrites the token file"
+      ],
+      "files": []
+    }
+  ]
+}
