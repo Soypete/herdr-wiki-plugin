@@ -1,0 +1,54 @@
+#!/bin/sh
+# worker-gh: run gh as the swarm's bot account.
+#
+# Template. Copy this file onto PATH as <WRAPPER_NAME> and replace
+# <TOKEN_FILE> below with the absolute path of the owner-written token file.
+#
+# Reads the token file and exports GH_TOKEN only into the gh process it
+# execs. GH_TOKEN takes precedence over stored credentials, so the shared
+# keyring slot (service gh:github.com) is never read or written and the
+# owner's own gh login is untouched.
+#
+# Never add `set -x` here, and never echo, print or log the token.
+set -eu
+
+token_file="<TOKEN_FILE>"
+me="$(basename "$0")"
+
+case "$token_file" in
+  "<"*)
+    echo "$me: edit token_file in $0 and set the real token file path" >&2
+    exit 1
+    ;;
+esac
+
+if [ ! -f "$token_file" ]; then
+  echo "$me: $token_file is missing; ask the owner to write it" >&2
+  exit 1
+fi
+
+# Refuse a token file that group or others can read: mode must be 0600.
+# ls (not stat) because stat's flags differ between macOS and Linux.
+# shellcheck disable=SC2012
+case "$(ls -l "$token_file" | cut -c2-10)" in
+  rw-------) ;;
+  *)
+    echo "$me: $token_file must be mode 0600; ask the owner to fix it" >&2
+    exit 1
+    ;;
+esac
+
+IFS= read -r GH_TOKEN < "$token_file" || true
+if [ -z "${GH_TOKEN:-}" ]; then
+  echo "$me: $token_file is empty; ask the owner to rewrite it" >&2
+  exit 1
+fi
+export GH_TOKEN
+unset GITHUB_TOKEN
+
+# Keep gh's own state (config, state.yml) out of the owner's default config
+# dir. This does not isolate the keyring; GH_TOKEN above is what does.
+GH_CONFIG_DIR="$(dirname "$token_file")"
+export GH_CONFIG_DIR
+
+exec gh "$@"

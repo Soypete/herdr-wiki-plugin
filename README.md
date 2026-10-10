@@ -132,6 +132,14 @@ Each agent gets a native skill that runs `wiki <args>`. See
 Any agent can also run the CLI directly (`python3 -m haikei_wiki …`) without
 a skill.
 
+### Give the swarm its own git identity
+
+Workers push and open PRs as you by default, which means you can't formally
+approve their PRs. [`docs/setting-up-a-worker-identity.md`](docs/setting-up-a-worker-identity.md)
+walks through creating a bot account, a scoped token and branch protection,
+and the [`worker-git-identity`](skills/README.md#worker-git-identity) template
+skill teaches workers to use it.
+
 All paths share the same code (`haikei_wiki.cli`), the same closed
 vocabulary, and the same single-writer inbox — so an agent capture and a
 human `prefix+W` capture land identically.

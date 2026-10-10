@@ -6,7 +6,10 @@ This repo ships skills for two agents that work together:
 - [**herdr-orchestrator**](#herdr-orchestrator) — orchestrate parallel coding
   work across herdr worker agents (policy layer over the base herdr skill).
 
-Both skills are available for three harnesses: Claude Code, Codex (plugin), and
+A third skill, [**worker-git-identity**](#worker-git-identity), is a template
+for having workers commit, push and open PRs as a bot account instead of you.
+
+All skills are available for three harnesses: Claude Code, Codex (plugin), and
 opencode. All copies are byte-identical (verified by `tests/test_skill_drift.py`).
 
 herdr-orchestrator is a **policy layer** over the base herdr skill. It requires
@@ -174,3 +177,26 @@ skill. If you have already installed the plugin (see [Codex](#codex-1) under
 wiki), the herdr-orchestrator skill is available automatically — no additional
 installation needed. The plugin's `skills/` directory contains both `wiki/`
 and `herdr-orchestrator/`.
+
+---
+
+## worker-git-identity
+
+A **template** skill that teaches workers to commit, push and open pull
+requests as a dedicated bot GitHub account, so you can formally approve their
+PRs and protect `main` with code-owner review. It ships a `gh` wrapper
+(`scripts/worker-gh`) that hands the bot's token to `gh` as `GH_TOKEN` from a
+0600 file, and a debugging table for the usual traps (the shared macOS keyring
+slot, Apple git's `osxkeychain` helper, global `insteadOf` rewrites to SSH,
+`git config --local` in linked worktrees).
+
+Set up the bot account, team, token and branch protection first:
+[**Setting up a worker identity**](../docs/setting-up-a-worker-identity.md).
+Then fill in the placeholders (`<BOT_USER>`, `<BOT_ID>`, `<ORG>`,
+`<TOKEN_FILE>`, `<WRAPPER_NAME>`) in your installed copy.
+
+| Harness | Source in this repo | Install |
+| --- | --- | --- |
+| Claude Code | `skills/claude/worker-git-identity/` | copy to `~/.claude/skills/worker-git-identity/` (without `evals/`) |
+| opencode | `.opencode/skills/worker-git-identity/` | already allowed in this repo's `opencode.json`; elsewhere copy it and add `"worker-git-identity": "allow"` |
+| Codex | `skills/codex/plugins/herdr-wiki/skills/worker-git-identity/` | ships in the `herdr-wiki` plugin (see [Codex](#codex)) |

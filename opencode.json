@@ -3,7 +3,8 @@
   "permission": {
     "skill": {
       "wiki": "allow",
-      "herdr-orchestrator": "allow"
+      "herdr-orchestrator": "allow",
+      "worker-git-identity": "allow"
     }
   }
 }
