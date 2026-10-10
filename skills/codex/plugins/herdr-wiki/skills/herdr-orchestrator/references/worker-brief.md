@@ -43,8 +43,10 @@ Write each brief to `/tmp/briefs/<name>.md`, then send it with `herdr agent prom
 Do not merge.
 
 ## Coordination
+- Before editing, run every wiki search named above. If a relevant contract or decision conflicts with this brief, stop and report the conflict before changing the interface.
 - Record durable decisions with `wiki capture --type decision ...`.
 - If you change a shared interface: `wiki capture --type contract_change ... --link about:<page>`.
+- If the orchestrator or another worker records a relevant contract change, read it and capture an `ack` before continuing against that interface.
 - If you are blocked: `wiki capture --type blocker ...`, then stop and say "BLOCKED: <one line>". Don't work around it.
 - Before finishing, capture a `handoff` summarizing what you did and any loose ends.
 ```
