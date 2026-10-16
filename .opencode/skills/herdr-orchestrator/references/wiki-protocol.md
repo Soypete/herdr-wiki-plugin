@@ -5,12 +5,20 @@ The wiki (herdr-wiki-plugin, `wiki` CLI) is the shared, durable memory between t
 ## Mechanics that matter
 
 - `wiki capture` writes one atomic record to the inbox. It is visible to `wiki search` immediately (marked `inbox:`), so other agents see it right away without `organize`.
-- `wiki organize` is the single writer to the graph. Leave it to the user unless told otherwise.
+- `wiki organize` is the single writer to the graph. A separately authorized, single-writer scheduled organizer may run `wiki organize` with a non-overlapping lock; otherwise leave it to the user. Inbox captures are searchable before organizing.
 - The vocabulary is closed. A capture with an unknown `--type` or link predicate is rejected; don't invent new ones. Adding types means editing `tbox.toml`, which is the user's call.
 - `wiki audit` is read-only. `wiki delete` is exact-match and logged — the orchestrator does not delete.
 
-Types: `claim, contradiction, decision, entity, source, blocker, handoff, ack, release, contract_change`
+Types: `claim, contradiction, decision, entity, source, blocker, handoff, ack, release, contract_change, plan`
 Predicates: `derived_from, contradicts, supports, about, relates_to, answers, acknowledges, blocks`
+
+## Session-scoped plans
+
+Capture execution plans as `plan` records with session ID, task IDs, owner, dependencies, status, and linked decision/contract IDs. Keep durable design choices as `decision`, not `plan`. On successful completion, mark plans complete/archived and keep handoffs, decisions, and contract changes durable. On session interruption, rate limit, or crash, preserve plans as recoverable for another orchestrator; do not expire unfinished tasks solely because a session ended. `plan` requires adding it to the *installed* `tbox.toml` (the starter vocabulary is not retroactive).
+
+## Search discipline
+
+At worker startup, search the wiki for plan, decisions, contracts, and handoffs, then run targeted `rg` against the affected paths for code facts. Record searches and relevant IDs in the handoff; an empty result is valid. Require atomic logical commits and `gh stack` for dependent PRs; verify evidence before marking complete. Never rely only on a skill instruction as proof a worker complied.
 
 ## Durable vs transient
 
