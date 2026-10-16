@@ -1,6 +1,6 @@
 ---
 name: wiki
-description: Search and capture in the personal LLM-Wiki knowledge base. Use when the user asks to search the wiki, recall prior notes/claims/decisions, or capture a durable finding into the knowledge base.
+description: Search and capture in the personal LLM-Wiki knowledge base. Use before Herdr coding and orchestration tasks to retrieve shared plans, decisions, contracts, blockers, and handoffs; also for wiki lookup and durable capture.
 ---
 
 # Wiki
@@ -38,8 +38,10 @@ wiki delete inbox rec-1
 
 ## How to use it
 
+- **Before coding**, search the wiki for relevant plans, decisions, contracts, blockers, and handoffs. Then use targeted `rg` against relevant source paths to verify current code. An empty wiki result is valid.
 - **Before answering**, search the wiki for prior notes/claims about the
   topic: `wiki search <topic>`.
+- **Before completion**, capture a task-linked handoff with wiki queries, atomic commits, tests, PR URL, and unfinished work; dependent PRs use `gh stack`.
 - **When you learn something durable**, capture it:
   `wiki capture --title "..." --type claim --content "..."`.
 - Use `--json` on `search` when you need to parse results programmatically.
