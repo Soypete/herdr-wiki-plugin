@@ -13,6 +13,7 @@ them in your context.
 
 ```
 wiki search <query> [--top-k N] [--no-inbox] [--json]
+wiki show <page> [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link predicate:target ...]
 wiki organize
@@ -28,6 +29,8 @@ wiki search whitepaper
 wiki search "memory indexing" --top-k 5
 wiki search whitepaper --json
 wiki search coord/claim --no-inbox
+wiki show decision/draft-adr
+wiki show inbox:20261001T144448933485-abcd
 wiki stats
 wiki capture --title "finding" --type claim --content "..." --link derived_from:imported/whitepaper
 wiki audit
@@ -45,6 +48,10 @@ wiki delete inbox rec-1
 - **When you learn something durable**, capture it:
   `wiki capture --title "..." --type claim --content "..."`.
 - Use `--json` on `search` when you need to parse results programmatically.
+- Read full pages with `wiki show <page>` (or `wiki show inbox:<id>` for a pending
+  inbox record) — never read wiki files with a file tool; it triggers
+  external-directory permission prompts in scratch worktrees. `--json` returns
+  `{path, title, category, created, content, links}`.
 
 ## Conventions to read before writing code
 

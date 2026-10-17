@@ -6,6 +6,7 @@ search popup (a human UI), this prints results to the terminal.
 
 Usage:
     python3 -m haikei_wiki search <query> [--top-k N] [--no-inbox] [--json]
+    python3 -m haikei_wiki show <page> [--json]
     python3 -m haikei_wiki stats
     python3 -m haikei_wiki capture --title T --type T --content C [--link p:t ...]
     python3 -m haikei_wiki organize
@@ -40,6 +41,7 @@ from .lifecycle import (
     withdraw,
 )
 from .organizer import OrganizerError, organize
+from .show import ShowError, show
 from .vocabulary import VocabularyViolation, load_vocabulary
 
 # Superseded/withdrawn pages still surface in search (the history is the point)
@@ -89,6 +91,26 @@ def _search(query: str, top_k: int, as_json: bool, include_inbox: bool = True) -
             label = f" [{row['status']}]" if row["status"] else ""
             print(f"[{row['score']:.2f}]{label} {row['path']}")
             print(f"    {row['snippet']}")
+    return 0
+
+
+def _show(spec: str, as_json: bool) -> int:
+    try:
+        page = show(spec)
+    except ShowError as e:
+        print(f"show: {e}", file=sys.stderr)
+        return 2
+    if as_json:
+        print(json.dumps(page.to_dict(), indent=2))
+        return 0
+    print(f"path: {page.path}")
+    print(f"title: {page.title}")
+    print(f"category: {page.category}")
+    print(f"created: {page.created}")
+    if page.links:
+        print(f"links: {', '.join(page.links)}")
+    print()
+    print(page.content.rstrip())
     return 0
 
 
@@ -285,6 +307,17 @@ def main(argv=None) -> int:
     )
     p_search.add_argument("--json", action="store_true")
 
+    p_show = sub.add_parser(
+        "show",
+        help="print a full wiki page or inbox record (agents: use this, not a file tool)",
+    )
+    p_show.add_argument(
+        "spec",
+        help="page path as printed by search (wiki/decision/foo.md, decision/foo) "
+        "or an inbox id (inbox:<id>)",
+    )
+    p_show.add_argument("--json", action="store_true", help="structured output")
+
     p_stats = sub.add_parser("stats", help="wiki statistics")
     p_stats.add_argument("--json", action="store_true")
 
@@ -345,6 +378,8 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.cmd == "search":
         return _search(args.query, args.top_k, args.json, not args.no_inbox)
+    if args.cmd == "show":
+        return _show(args.spec, args.json)
     if args.cmd == "stats":
         return _stats(args.json)
     if args.cmd == "capture":
