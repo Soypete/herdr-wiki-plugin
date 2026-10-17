@@ -95,10 +95,14 @@ def _apply_status(
     status: str,
     superseded_by: str | None = None,
     reason: str | None = None,
+    extra: dict[str, str] | None = None,
 ) -> str:
     """Rewrite a page's frontmatter, preserving title/category/created/body."""
     fields, raw, body = parse_frontmatter(text)
     fields["status"] = status
+    if extra:
+        for key, value in extra.items():
+            fields[key] = value
     if superseded_by is not None:
         fields["superseded_by"] = superseded_by
     elif status == SUPERSEDED:

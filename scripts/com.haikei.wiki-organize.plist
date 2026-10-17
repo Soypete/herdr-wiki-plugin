@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- Single-writer scheduled organizer for the herdr wiki (issue #22).
+     Install:
+       export WIKI_PATH=...           # optional, if not default location
+       launchctl load -w ~/Library/LaunchAgents/com.haikei.wiki-organize.plist
+     Logs: plugin state dir organize-daemon.log (see haikei_wiki/daemon.py).
+     The runner takes the organizer's exclusive lock, so a manual `wiki
+     organize` never races the schedule: one of them skips cleanly. -->
+<dict>
+  <key>Label</key><string>com.haikei.wiki-organize</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>python3</string>
+    <string>-m</string>
+    <string>haikei_wiki</string>
+    <string>organize</string>
+    <string>--daemon</string>
+  </array>
+  <key>StartInterval</key><integer>900</integer>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key>
+  <string>/tmp/haikei-wiki-organize.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/haikei-wiki-organize.err.log</string>
+</dict>
+</plist>
