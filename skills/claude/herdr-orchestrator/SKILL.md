@@ -77,6 +77,16 @@ Break the goal into tasks small enough that one worker can finish one with a PR 
 
 Capture the execution plan as a wiki `plan` (task list, dependencies, owners, session ID, status) so workers can find each other's scope. If the installed vocabulary lacks `plan`, stop and request configuration migration rather than silently using `decision`. Show the plan to the user before dispatching if the work is large or ambiguous; otherwise proceed and report.
 
+Run the file-overlap gate before any parallel dispatch (issue #20, observation 1):
+
+- For each task, write down its expected file set (paths touched). `wiki claims --json` shows what every orchestrator already holds (`wiki claim` / `wiki reserve` register what this effort takes).
+- **Refuse parallel dispatch when two tasks, or a task and an active claim, overlap on any path.** Chain them instead: they become a plain base-branch PR sequence (one worker owns the chain, in order) and the merge order is recorded in the wiki.
+- Shared sequences (migration numbers, eval-case ids) get wiki reservations before a task claims one: `wiki reserve --repo <r> --kind migration --value 074`.
+- Register each dispatch as a claim: `wiki claim --repo <r> --paths '<globs>' --pr <n> --branch <b>`.
+- Re-check `wiki claims` on every re-plan; update claims when scope changes.
+
+**No native stacks.** GitHub-native stacked PRs block API merges and retargets ("must be merged using the asynchronous merge REST API"; "Cannot change the base branch because the pull request is part of a stack"). Use plain base-branch PRs at every level (`gh pr create --base <parent-branch>`), and right after a parent merges, retarget each child to main: `gh pr edit <child> --base main`.
+
 ### 3. Scaffold and dispatch
 
 For each task:
@@ -114,6 +124,13 @@ React by state — never nudge a worker that is `working` and making progress; i
 | `BLOCKED` | Read it. Approval/question you can answer from the plan or wiki → answer via `herdr agent prompt`. Needs the user → ask the user. |
 | `STALL` (working, output unchanged N cycles) | Read it. Looping or stuck → `herdr agent send-keys <name> esc`, then a short re-scoping prompt. Counts as an attempt. |
 | `GONE` | The agent exited. Read the pane, check the wiki for a handoff, decide whether to restart. |
+
+On every tick, also run the convergence checks:
+
+- **Merge order holds.** The wiki records which PR must merge before which ("A must merge before B"). Do not call a PR ready while its merge-order predecessor is still open; after each merge, re-check the wiki and release the holds.
+- **Stale CI runs.** `scripts/cancel-stale-runs.sh [--repo o/r]` cancels runs whose branch no longer belongs to an open PR — a merged branch's eval run once held all self-hosted runners for ~5h. Also pin `timeout-minutes` on gate jobs and keep a `pull_request: closed` trigger in the same concurrency group so a closing PR cancels its run.
+- **Reviewer requests.** The owner reviews non-draft PRs that request them. `scripts/request-reviewers.sh --reviewer <user>` re-requests on any non-draft, unapproved PR that lacks the request (it uses the REST reviewer endpoint because `gh pr edit --add-reviewer` fails with fine-grained bot tokens).
+- **Safe branch cleanup.** Before deleting a merged PR's head branch, re-query `gh pr view <n> --json state` until it reports MERGED: a 502 or a lagging API once had cleanup delete the branch of a PR that was still open, closing it.
 
 Good nudges are specific and short: *"Unit tests for `ParseToken` are missing the expired-token case. Add it, rerun `go test ./auth/...`, then update the PR."* Bad nudges: *"status?"*, *"keep going"*.
 
