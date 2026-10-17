@@ -9,6 +9,7 @@ and installable on its own. Based on Karpathy's LLM-Wiki pattern:
 """
 
 import json
+import re
 import subprocess
 import threading
 from datetime import datetime
@@ -34,6 +35,11 @@ from .interfaces import (
     Link,
     PathExplanation,
     SystemStats,
+)
+from .textsearch import score_document
+
+_FM_TITLE_RE = re.compile(
+    r"^---\s*\ntitle:[ \t]*(.*?)[ \t]*(?:\n|$)", re.DOTALL
 )
 
 
@@ -94,52 +100,59 @@ class LLMWiki:
 
     def search(self, query: str, top_k: int = 10) -> list[dict]:
         """
-        Search wiki using grep and index.md.
+        Search wiki pages with tokenized, ranked matching.
+
+        The query is tokenized; pages containing all terms rank above
+        partial matches, title hits outrank body hits. Matching is
+        fixed-string based (no regex metacharacter surprises).
         """
         results = []
-
-        # Search index.md
+        # index.md has no frontmatter title
         if self.index_file.exists():
-            content = self.index_file.read_text()
-            if query.lower() in content.lower():
+            try:
+                content = self.index_file.read_text()
+            except OSError:
+                content = ""
+            score = score_document(query, "index", content)
+            if score is not None:
                 results.append(
                     {
                         "file": "index.md",
                         "path": str(self.index_file),
                         "content": content,
-                        "score": 0.3,
+                        "score": score,
                     }
                 )
 
-        # Grep through wiki files
+        # Tokenized scan through wiki files (pure Python; grep -r would match
+        # the whole query as one regex, and unescaped user input changes its
+        # meaning).
         if self.wiki_dir.exists():
-            try:
-                grep_result = subprocess.run(
-                    ["grep", "-r", "-l", "-i", query, str(self.wiki_dir)],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
+            for path in self.wiki_dir.rglob("*.md"):
+                try:
+                    content = path.read_text()
+                except OSError:
+                    continue
+                # title from frontmatter when present, else the filename
+                stem = path.stem
+                m = _FM_TITLE_RE.match(content)
+                title = m.group(1) if m else stem
+                if not title:
+                    title = stem
+                score = score_document(query, f"{title} {stem}", content)
+                if score is None:
+                    continue
+                results.append(
+                    {
+                        "file": path.name,
+                        "path": str(path),
+                        "content": content[:1000],
+                        "score": score,
+                    }
                 )
-                for match in grep_result.stdout.strip().split("\n"):
-                    if match and Path(match).exists():
-                        content = Path(match).read_text()
-                        # Simple scoring: title match > content match
-                        filename = Path(match).stem.lower()
-                        score = 0.9 if filename in query.lower() else 0.6
-
-                        results.append(
-                            {
-                                "file": Path(match).name,
-                                "path": match,
-                                "content": content[:1000],
-                                "score": score,
-                            }
-                        )
-            except Exception:
-                pass
 
         # Sort by score and limit
-        results.sort(key=lambda x: x["score"], reverse=True)
+        results.sort(key=lambda x: (x["score"], x["path"]), reverse=True)
         return results[:top_k]
 
     def search_inbox(self, query: str) -> list[dict]:
@@ -162,11 +175,8 @@ class LLMWiki:
 
             title = str(record.get("title", ""))
             content = str(record.get("content", ""))
-            if q in title.lower():
-                score = 0.9
-            elif q in content.lower():
-                score = 0.6
-            else:
+            score = score_document(q, title, f"{title} {content}")
+            if score is None:
                 continue
 
             # "inbox:" prefix + source mark the record as pending/unorganized
