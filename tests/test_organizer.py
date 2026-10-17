@@ -126,3 +126,100 @@ def test_organize_lock_is_exclusive(tmp_path: Path):
 
     with pytest.raises(OrganizerError, match="another organizer"):
         organize(wiki_path=wiki, vocab=load_vocabulary(STARTER), lock_path=lock)
+
+
+# --- lifecycle status on inbox records + #13 recovery ----------------------
+
+
+def _base_record(rid, title, content):
+    return {
+        "id": rid,
+        "title": title,
+        "entity_type": "claim",
+        "content": content,
+        "links": [],
+        "provenance": {"agent": "test"},
+        "created_at": "2026-10-01T14:44:48",
+    }
+
+
+def test_organize_files_superseded_status_with_the_page(tmp_path: Path):
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    (wiki / "log.md").write_text("# Wiki Log\n")
+    rec = _base_record("rec-sup", "stale capture", "superseded capture body")
+    rec["status"] = "superseded"
+    rec["superseded_by"] = "wiki/claim/newer.md"
+    seed_inbox(wiki, rec)
+
+    result = organize(wiki_path=wiki, vocab=load_vocabulary(STARTER), lock_path=tmp_path / "lock")
+
+    assert len(result.organized) == 1
+    from haikei_wiki.lifecycle import parse_frontmatter
+
+    page = wiki / "wiki" / "claim" / "stale-capture.md"
+    fields, _, _ = parse_frontmatter(page.read_text())
+    assert fields["status"] == "superseded"
+    assert fields["superseded_by"] == "wiki/claim/newer.md"
+    assert not list((wiki / "inbox").glob("*.json"))
+
+
+def test_organize_files_withdrawn_status_with_the_page(tmp_path: Path):
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    (wiki / "log.md").write_text("# Wiki Log\n")
+    rec = _base_record("rec-wd", "wrong capture", "withdrawn capture body")
+    rec["status"] = "withdrawn"
+    rec["reason"] = "was wrong when captured"
+    seed_inbox(wiki, rec)
+
+    organize(wiki_path=wiki, vocab=load_vocabulary(STARTER), lock_path=tmp_path / "lock")
+
+    from haikei_wiki.lifecycle import parse_frontmatter
+
+    page = wiki / "wiki" / "claim" / "wrong-capture.md"
+    fields, _, _ = parse_frontmatter(page.read_text())
+    assert fields["status"] == "withdrawn"
+    assert fields["reason"] == "was wrong when captured"
+
+
+def test_organize_recovers_frontmattered_json_records(tmp_path: Path):
+    """Records corrupted by the pre-#13 supersede/withdraw bug (YAML
+    frontmatter prepended to the JSON) are salvaged, not rejected: the JSON
+    parses after stripping the frontmatter, and the frontmatter status is
+    applied to the filed page."""
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    (wiki / "log.md").write_text("# Wiki Log\n")
+    rec = _base_record("rec-broken", "double captured", "salvage me")
+    rec["status"] = "superseded"
+    rec["superseded_by"] = "inbox/20261001T14533196721-other.json"
+    payload = json.dumps(rec, indent=2)
+    inbox = wiki / "inbox"
+    inbox.mkdir(parents=True, exist_ok=True)
+    (inbox / "rec-broken.json").write_text(
+        "\n".join(
+            [
+                "---",
+                "status: superseded",
+                "superseded_by: inbox/20261001T14533196721-other.json",
+                "---",
+                "",
+                payload,
+            ]
+        )
+        + "\n"
+    )
+
+    result = organize(wiki_path=wiki, vocab=load_vocabulary(STARTER), lock_path=tmp_path / "lock")
+
+    assert len(result.organized) == 1, result.rejected
+    assert not result.rejected
+    from haikei_wiki.lifecycle import parse_frontmatter
+
+    page = wiki / "wiki" / "claim" / "double-captured.md"
+    fields, _, _ = parse_frontmatter(page.read_text())
+    assert fields["status"] == "superseded"
+    assert fields["superseded_by"] == "inbox/20261001T14533196721-other.json"
+    # the recovered record left the pending inbox
+    assert not list(inbox.glob("*.json"))

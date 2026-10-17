@@ -7,6 +7,12 @@ writes wiki/ pages and index.md (through the existing LLMWikiAdapter). It:
   (it PROPOSES types from the vocabulary; it never adds new ones),
 - writes one page per capture via adapter.write_memory, embedding the
   capture's links as wikilinks in the page content,
+- honours lifecycle status on inbox records (superseded/withdrawn, set
+  inside the JSON by `wiki supersede`/`withdraw` — never frontmatter):
+  the page is filed with that status instead of looking new,
+- recovers records a supersede/withdraw already corrupted with markdown
+  frontmatter (pre-#13 fix records): strips the frontmatter block, parses
+  the JSON, and applies the salvaged status instead of rejecting it,
 - appends a greppable 'organize' entry to log.md,
 - moves processed records to inbox/processed/ (rejected to inbox/rejected/).
 
@@ -16,6 +22,7 @@ concurrently, so the graph always has exactly one writer.
 
 import json
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -23,6 +30,12 @@ from pathlib import Path
 
 from .capture import CaptureInbox, log_append, wiki_root
 from .adapter import LLMWikiAdapter
+from .lifecycle import (
+    LIFECYCLE_STATES,
+    WITHDRAWN,
+    SUPERSEDED,
+    apply_lifecycle_status,
+)
 from .search_index import (
     get_index,
     index_inbox_file,
@@ -121,13 +134,10 @@ def _organize_locked(inbox: CaptureInbox, vocab: Vocabulary) -> OrganizeResult:
     index = get_index(inbox.wiki_path)
 
     for path in inbox.pending():
-        try:
-            record = json.loads(path.read_text())
-        except (json.JSONDecodeError, OSError) as e:
-            result.rejected.append((str(path), f"unreadable record: {e}"))
+        record, note = _load_record(path)
+        if record is None:
+            result.rejected.append((str(path), note))
             _move(path, rejected_dir, path.name)
-            if index is not None:
-                index.remove(f"inbox:{path.stem}")
             continue
 
         try:
@@ -155,15 +165,69 @@ def _organize_locked(inbox: CaptureInbox, vocab: Vocabulary) -> OrganizeResult:
             page_content, {"title": title, "category": entity_type}
         )
         rel = Path(page_path).relative_to(inbox.wiki_path).as_posix()
+        page_file = inbox.wiki_path / rel
+        # lifecycle status travels with the record: a superseded/withdrawn
+        # inbox record is filed with that status, never as new (issue #13)
+        status = str(record.get("status", ""))
+        if status in LIFECYCLE_STATES:
+            apply_lifecycle_status(
+                page_file,
+                status=status,
+                superseded_by=str(record.get("superseded_by", "")) or None,
+                reason=str(record.get("reason", "")) or None,
+            )
+            log_note = f" ({status})"
+        else:
+            log_note = ""
         date = datetime.now().strftime("%Y-%m-%d")
-        log_append(inbox.log_file, f"\n## [{date}] organize | {title} -> {rel}")
+        log_append(inbox.log_file, f"\n## [{date}] organize | {title} -> {rel}{log_note}")
         _move(path, processed_dir, path.name)
         if index is not None:
             index.remove(f"inbox:{path.stem}")
-            page_file = inbox.wiki_path / rel
             index_page_file(index, page_file, inbox.wiki_path)
         result.organized.append((str(path), rel))
     return result
+
+
+_FM_PATCH_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.S)
+
+
+def _load_record(path: Path) -> tuple[dict | None, str]:
+    """Read an inbox record, recovering a #13-corrupted one when possible.
+
+    Returns (record, note); note is "" normally or "recovered". record is
+    None only when neither plain JSON nor the recoverable form parses.
+    """
+    try:
+        text = path.read_text(encoding="utf-8", errors="strict")
+    except (OSError, UnicodeDecodeError) as e:
+        return None, f"unreadable record: {e}"
+    try:
+        return json.loads(text), ""
+    except json.JSONDecodeError:
+        pass
+    # recovery pass: a pre-issue-13 supersede/withdraw wrote markdown
+    # frontmatter into this *.json. Strip it, parse the JSON, apply the
+    # frontmatter status fields.
+    m = _FM_PATCH_RE.match(text)
+    if not m:
+        return None, "unreadable record: invalid JSON"
+    try:
+        record = json.loads(text[m.end() :])
+    except json.JSONDecodeError:
+        return None, "unreadable record: invalid JSON under frontmatter"
+    keys: dict = {}
+    for line in m.group(1).splitlines():
+        k, _, v = line.partition(":")
+        if k.strip():
+            keys[k.strip()] = v.strip().strip('"')
+    if keys.get("status"):
+        record["status"] = keys["status"]
+    if keys.get("superseded_by"):
+        record["superseded_by"] = keys["superseded_by"]
+    if keys.get("reason"):
+        record["reason"] = keys["reason"]
+    return record, "recovered"
 
 
 def _move(src: Path, dest_dir: Path, name: str) -> None:
