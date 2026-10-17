@@ -66,8 +66,7 @@ CREATE TABLE IF NOT EXISTS docs (
 CREATE TABLE IF NOT EXISTS embeddings (
     path       TEXT PRIMARY KEY,
     model      TEXT NOT NULL,
-    vector     BLOB NOT NULL,
-    REFERENCES docs(path)
+    vector     BLOB NOT NULL
 );
 """
 
@@ -224,10 +223,9 @@ class SearchIndex:
             "content=excluded.content, mtime=excluded.mtime",
             (path_str, kind, title, category, content, mtime),
         )
+        self.conn.execute("DELETE FROM docs_fts WHERE path=?", (path_str,))
         self.conn.execute(
-            "INSERT INTO docs_fts(path, title, content) VALUES(?,?,?) "
-            "ON CONFLICT(path) DO UPDATE SET title=excluded.title, "
-            "content=excluded.content",
+            "INSERT INTO docs_fts(path, title, content) VALUES(?,?,?)",
             (path_str, title, content),
         )
         # keep only embeddings of a live, current model
@@ -410,8 +408,53 @@ def parse_since(spec: str) -> float | None:
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         return dt.timestamp()
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return None
+
+
+def get_index(wiki_path: Path, embedder=None) -> SearchIndex:
+    """Open (best-effort) the SearchIndex; returns None when unavailable."""
+    try:
+        return SearchIndex(wiki_path, embedder)
+    except IndexUnavailable:
+        return None
+
+
+def index_capture_record(wiki_path: Path, record_path: Path) -> None:
+    """Index one freshly captured inbox record (best effort, never fatal)."""
+    try:
+        index = get_index(wiki_path)
+        if index is None:
+            return
+        index_inbox_file(index, record_path, wiki_path)
+        return
+    except Exception:
+        return
+
+
+def index_organized_pages(wiki_path: Path, pairs: list) -> None:
+    """After organize: index new pages, drop inbox records that were filed."""
+    try:
+        index = get_index(wiki_path)
+        if index is None:
+            return
+        for _src, rel in pairs:
+            p = Path(wiki_path) / rel
+            if p.is_file():
+                index_page_file(index, p, wiki_path)
+    except Exception:
+        return
+
+
+def index_removed(wiki_path: Path, path_str: str) -> None:
+    """Drop a document (moved inbox record, deleted page) from the index."""
+    try:
+        index = get_index(wiki_path)
+        if index is None:
+            return
+        index.remove(path_str)
+    except Exception:
+        return
 
 
 def index_page_file(index: SearchIndex, path: Path, wiki_root: Path) -> None:
@@ -444,7 +487,7 @@ def index_inbox_file(index: SearchIndex, path: Path, wiki_root: Path) -> None:
     """Best-effort incremental index of one pending inbox record."""
     try:
         record = json.loads(path.read_text())
-    except json.JSONDecodeError, OSError:
+    except (json.JSONDecodeError, OSError):
         return
     index.upsert(
         f"inbox:{record.get('id', path.stem)}",

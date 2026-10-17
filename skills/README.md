@@ -105,7 +105,7 @@ The ready-to-paste block is in [`../agent-instructions.md`](../agent-instruction
 ### The commands (all agents)
 
 ```
-wiki search <query> [--top-k N] [--no-inbox] [--json]
+wiki search <query> [--top-k N] [--no-inbox] [--json] [--mode hybrid|lexical|semantic] [--explain] [--type T] [--since 24h] [--repo owner/name]
 wiki show <page> [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link predicate:target ...]
@@ -122,6 +122,15 @@ search to settled wiki pages. Search never modifies the inbox.
 `wiki show <page>` prints a full page or inbox record (agents should use it
 instead of reading wiki files directly); `--json` returns
 `{path, title, category, created, content, links}`.
+
+Search is **hybrid** by default: a local FTS5 (BM25) index is kept
+incrementally by `capture`/`organize`/`delete` and combined (reciprocal rank
+fusion) with semantic embeddings when a provider is configured
+(`WIKI_EMBED_MODEL`, optionally `WIKI_EMBED_URL` for an OpenAI-compatible
+/Ollama-style endpoint on the tailnet). Without one it degrades to
+lexical-only, offline. `--mode` pins `lexical`/`semantic`; `--explain`
+(untext/json) adds per-result score breakdowns; `--type`, `--since`, and
+`--repo` narrow results for orchestrator queries.
 
 `wiki audit` is read-only: scans for orphans, broken links, unindexed pages,
 empty pages, and stale inbox records. `wiki delete` requires an exact path or

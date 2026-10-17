@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from .search_index import index_removed
 from .capture import log_append, wiki_root
 
 
@@ -98,6 +99,7 @@ def delete_page(wiki_path: Optional[Path] = None, page_spec: str = "") -> Delete
 
     # Remove the file
     os.remove(target)
+    index_removed(wiki, target_rel)
 
     # Remove from index.md
     if index_file.exists():
@@ -176,6 +178,7 @@ def delete_inbox(
         dest = deleted_dir / f"{n}-{target.name}"
         n += 1
     os.replace(target, dest)
+    index_removed(wiki, f"inbox:{record_id}")
 
     # Log
     date = datetime.now().strftime("%Y-%m-%d")
