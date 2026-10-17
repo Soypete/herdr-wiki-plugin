@@ -8,6 +8,8 @@ Write each brief to `/tmp/briefs/<name>.md`, then send it with `herdr agent prom
 
 - **One outcome.** A brief that asks for two unrelated things gets half of each.
 - **Say why.** One or two sentences of purpose lets the worker make sensible calls you didn't anticipate.
+- **Bounded context.** Search wiki before targeted `rg`; don't paste whole histories. For 100K OpenCode contexts, checkpoint at 60-70K and compact/restart near 80K.
+- **Atomic history.** Require one logical change per commit; dependent PRs use `gh stack` and keep a single stack owner.
 - **Point, don't paste.** Name the wiki searches and files to read; don't paste whole files into the prompt.
 - **Make "done" checkable.** An exact test command and an exact deliverable.
 - **Draw the fence.** Say what is out of scope and which files belong to other workers.
@@ -23,6 +25,7 @@ Write each brief to `/tmp/briefs/<name>.md`, then send it with `herdr agent prom
 
 ## Context — read first
 - `wiki search "<query>"` — <what they'll find: e.g. the token format decision>
+- After those searches, use targeted `rg -n "<symbol>" <relevant/path>` to locate current implementation and tests; inspect only matching files.
 - `<path/to/file>` — <why it matters>
 - Plan: `wiki search "plan <goal>"` — see which tasks other workers own.
 
@@ -38,8 +41,10 @@ Write each brief to `/tmp/briefs/<name>.md`, then send it with `herdr agent prom
 ## Done means
 1. Unit tests cover the change, including <specific cases>.
 2. `<exact test command>` passes.
-3. PR opened with `gh stack submit` (or `gh pr create`), with a description covering what/why/how-tested.
-4. Reply with: PR URL, test command output summary, anything the reviewer should look at first.
+3. Changes are in small, logically atomic commits, each independently understandable.
+4. PR opened with `gh stack submit` (or `gh pr create`), with a description covering what/why/how-tested.
+5. A wiki `handoff` links task/plan, records wiki queries, changed commits, PR URL, tests and remaining work.
+6. Reply with: PR URL, test command output summary, anything the reviewer should look at first.
 Do not merge.
 
 ## Coordination
@@ -48,7 +53,7 @@ Do not merge.
 - If you change a shared interface: `wiki capture --type contract_change ... --link about:<page>`.
 - If the orchestrator or another worker records a relevant contract change, read it and capture an `ack` before continuing against that interface.
 - If you are blocked: `wiki capture --type blocker ...`, then stop and say "BLOCKED: <one line>". Don't work around it.
-- Before finishing, capture a `handoff` summarizing what you did and any loose ends.
+- Before finishing, capture a task-linked `handoff` summarizing wiki search queries (including empty results), decisions applied, atomic commits, PR URL, test results, and any loose ends.
 ```
 
 ## Worked example

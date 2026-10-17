@@ -27,6 +27,13 @@ When a worker struggles, the first fix is almost always a better scaffold (sharp
 5. **Three strikes, then escalate.** A task gets at most 3 attempts (see *Failure handling*). After the third, record a blocker in the wiki and stop to ask the user.
 6. **Durable → wiki. Transient → herdr.** Anything another agent (or a future session) needs goes in the wiki. Quick nudges and answers go straight to the pane.
 
+## Worker context and Git requirements
+
+- Require wiki search for relevant decisions, contracts, blockers, plans, and prior handoffs **before** targeted `rg` inspection. Use `rg` for current code facts, never as a substitute for shared decisions. Empty wiki results are acceptable; record queries in the handoff.
+- Each worker owns a worktree, makes small logical atomic commits, runs tests, and uses `gh stack` for dependent PRs; only use plain PR fallback if `gh stack` is unavailable. Humans merge.
+- For OpenCode workers configured with 100K context, aim to checkpoint durable state at 60-70K and compact/restart before 80K, with wiki references and Git commits. Never treat 100K as the normal operating target.
+- Maintain plan state in wiki; on successful completion archive the plan, on crashes/rate limits preserve incomplete work for takeover. Do not discard unfinished session plans.
+
 ## Preflight
 
 ```bash
@@ -46,7 +53,7 @@ Read the base herdr skill if it's installed; it owns exact command syntax and sa
 
 In Claude Code, use `/plan` before dispatching a multi-worker effort and `/loop` for recurring orchestration ticks. These commands provide a useful cadence for applying the protocol; they do not replace the wiki or the steps below. In Codex and opencode, use the equivalent planning and recurring-check mechanism available in that harness.
 
-- **In `/plan`:** search the wiki before decomposing the goal. Make the task graph, owners, dependencies, and relevant existing decisions explicit. Require each worker brief to name the wiki searches it must run and the durable records it must capture or acknowledge. Capture the resulting plan as a wiki `decision` before dispatch.
+- **In `/plan`:** search the wiki before decomposing the goal. Make the task graph, owners, dependencies, and relevant existing decisions explicit. Require each worker brief to name the wiki searches it must run and the durable records it must capture or acknowledge. Capture the resulting session-scoped execution plan in the wiki before dispatch (see `references/wiki-protocol.md`). Keep durable architectural decisions separate from plans.
 - **In every `/loop` tick:** search for new claims, decisions, blockers, and `contract_change` captures since the previous tick. Compare them with active worker scopes and PR stacks. Prompt affected workers to read relevant changes and capture an `ack` when an interface contract changed. Check progress and PR dependencies, update the plan when needed, and record durable changes in the wiki. Do not treat a loop tick as a status poll: it should apply new coordination information to active work.
 - **When work is idle or waiting:** keep the loop focused on actionable changes and review dependencies. Do not repeatedly wake workers or emit routine status when there is no new information.
 
@@ -68,7 +75,7 @@ Break the goal into tasks small enough that one worker can finish one with a PR 
 - **Worker kind.** `codex`, `claude`, or `opencode`. Use what the user asked for; otherwise spread by strength and keep it simple.
 - **Name.** Short, unique, matches `[a-z][a-z0-9_-]{0,31}` — e.g. `auth-api`, `auth-ui`.
 
-Capture the plan as a wiki `decision` (task list, dependencies, owners) so workers can find each other's scope. Show the plan to the user before dispatching if the work is large or ambiguous; otherwise proceed and report.
+Capture the execution plan as a wiki `plan` (task list, dependencies, owners, session ID, status) so workers can find each other's scope. If the installed vocabulary lacks `plan`, stop and request configuration migration rather than silently using `decision`. Show the plan to the user before dispatching if the work is large or ambiguous; otherwise proceed and report.
 
 ### 3. Scaffold and dispatch
 
@@ -118,7 +125,7 @@ For each claimed-done task:
 
 - `gh pr view <url> --json state,headRefName,baseRefName` — PR exists, correct base (stack parent).
 - Run the task's unit test command yourself in a scratch pane or the worktree. Don't take "tests pass" on faith.
-- Check the worker captured its decisions/handoff in the wiki.
+- Check the worker's wiki-first retrieval evidence, atomic logical commits, and task-linked handoff capture in the wiki. Do not mark complete with missing evidence.
 
 Then run e2e (rule 4) once the PRs it depends on are open.
 
