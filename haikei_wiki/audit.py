@@ -59,6 +59,16 @@ TOKEN_TO_GH = {
     "pedro-agentware": "HaikeiLabs/Agentware",
 }
 
+# Canonical repo token -> directory names it may be checked out as on disk.
+# Renames (e.g. pedro-tag -> Kei-Chat-Harness) should keep working: a repo
+# found under an alias directory is registered under its canonical token.
+REPO_DIR_ALIASES = {
+    "kei": ("Kei", "kei-policy-catalog"),
+    "kei-agents": ("Kei-Agents",),
+    "pedro-tag": ("Kei-Chat-Harness",),
+    "pedro-agentware": ("Agentware", "agentware"),
+}
+
 _DEFAULT_REPO_ROOTS = (
     Path.home() / "code",
     Path.home() / "code" / "haikei",
@@ -164,6 +174,17 @@ def discover_repos(extra_dirs=None) -> dict:
             cand = root / name
             if cand.is_dir() and _is_git_repo(cand):
                 result[name] = cand
+                break
+        if name in result:
+            continue
+        # renamed checkouts: look under each known alias directory name
+        for alias in REPO_DIR_ALIASES.get(name, ()):
+            for root in roots:
+                cand = root / alias
+                if cand.is_dir() and _is_git_repo(cand):
+                    result[name] = cand
+                    break
+            if name in result:
                 break
     return {k: v for k, v in result.items() if v.exists()}
 
@@ -1128,6 +1149,7 @@ def run_audit(
     findings.sort(key=lambda f: (order.get(f.confidence, 3), f.page, f.check))
     return AuditReport(findings=findings, pages_scanned=len(pages), checks=checks)
 
+
 # ======================================================================
 # Structural audit: orphans, broken links, unindexed, empty, stale inbox
 # ======================================================================
@@ -1140,6 +1162,7 @@ from .capture import wiki_root as _wiki_root
 @dataclass
 class StructuralReport:
     """Report from a structural wiki audit."""
+
     orphans: list[str] = field(default_factory=list)
     broken_links: list[tuple[str, str]] = field(default_factory=list)
     unindexed: list[str] = field(default_factory=list)
