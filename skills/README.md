@@ -142,6 +142,16 @@ reported. Claims expire (default 24h); `wiki release <id>` frees paths
 at merge time. A `wiki sync` shared backend for cross-machine
 orchestrators is a follow-up.
 
+Dispatch capacity is **declared, not probed** (issue #23):
+`$HERDR_PLUGIN_CONFIG_DIR/worker-capacity.toml` caps simultaneous workers
+(`[parallel_capacity]`, per-repo overrides), lists installed harnesses
+(codex/claude/opencode/pi) with their headless commands, and assigns models
+per harness (per-task > default > fallback). Opencode note: the interactive
+TUI cannot take a model from the CLI (Ctrl+P switch), so headless
+`opencode run --model <m>` is the dispatch that actually sets the model;
+otherwise the model is advisory and must be stated in the worker brief.
+Schema, precedence, and setup: see docs/worker-capacity.md.
+
 Search is **hybrid** by default: a local FTS5 (BM25) index is kept
 incrementally by `capture`/`organize`/`delete` and combined (reciprocal rank
 fusion) with semantic embeddings when a provider is configured

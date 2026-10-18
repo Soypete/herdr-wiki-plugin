@@ -1,0 +1,50 @@
+# herdr wiki worker capacity config (issue #23)
+#
+# Read by the orchestrator at plan time. Absent file = unlimited capacity
+# and today's probing behavior.
+
+[parallel_capacity]
+max_workers = 4                     # global cap; per-repo overrides below
+
+[repos."owner/name"]
+max_workers = 2                     # per-repo override (optional)
+
+# Model precedence: per-task override > harness default > [models].fallback.
+#
+# mode = "headless": dispatch command may contain {model}; the config SETS
+#   the model on launch (e.g. `opencode run --model <m>`, `codex exec --model`).
+# mode = "interactive": TUI harness - model cannot come from the CLI
+#   (opencode 2.0 switches models via the Ctrl+P UI), so the assigned model
+#   is advisory: the worker brief must name it and the worker switches.
+
+[harnesses.codex]
+mode = "headless"
+command = ["codex", "exec", "--model", "{model}"]
+
+[harnesses.codex.models]
+default = "gpt-5-codex"
+quick = "gpt-5-mini"                # per-task-type override
+
+[harnesses.claude]
+mode = "headless"
+command = ["claude", "-p", "--model", "{model}"]
+
+[harnesses.claude.models]
+default = "claude-sonnet-4-5"
+
+[harnesses.opencode]
+# opencode 2.0: `opencode mini -m provider/model` launches the minimal TUI
+# with the model set; mid-session switching is a Ctrl+P UI action, so the
+# worker brief names the model too. mode stays "interactive" because the
+# session is a live TUI.
+mode = "interactive"
+command = ["opencode", "mini", "--model", "{model}"]
+
+[harnesses.opencode.models]
+default = "opencode/grok-code"
+
+[harnesses.pi]
+enabled = false
+
+[models]
+fallback = "claude-sonnet-4-5"
