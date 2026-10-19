@@ -23,6 +23,12 @@ from pathlib import Path
 
 from .capture import CaptureInbox, log_append, wiki_root
 from .adapter import LLMWikiAdapter
+from .search_index import (
+    get_index,
+    index_inbox_file,
+    index_page_file,
+    index_removed,
+)
 from .vocabulary import Vocabulary, VocabularyViolation
 
 
@@ -111,12 +117,17 @@ def _organize_locked(inbox: CaptureInbox, vocab: Vocabulary) -> OrganizeResult:
     processed_dir = inbox.inbox_dir / "processed"
     rejected_dir = inbox.inbox_dir / "rejected"
 
+    # index hook: anything moved out of the pending inbox leaves the index
+    index = get_index(inbox.wiki_path)
+
     for path in inbox.pending():
         try:
             record = json.loads(path.read_text())
         except (json.JSONDecodeError, OSError) as e:
             result.rejected.append((str(path), f"unreadable record: {e}"))
             _move(path, rejected_dir, path.name)
+            if index is not None:
+                index.remove(f"inbox:{path.stem}")
             continue
 
         try:
@@ -124,6 +135,8 @@ def _organize_locked(inbox: CaptureInbox, vocab: Vocabulary) -> OrganizeResult:
         except VocabularyViolation as e:
             result.rejected.append((str(path), str(e)))
             _move(path, rejected_dir, path.name)
+            if index is not None:
+                index.remove(f"inbox:{path.stem}")
             continue
 
         title = record["title"]
@@ -145,6 +158,10 @@ def _organize_locked(inbox: CaptureInbox, vocab: Vocabulary) -> OrganizeResult:
         date = datetime.now().strftime("%Y-%m-%d")
         log_append(inbox.log_file, f"\n## [{date}] organize | {title} -> {rel}")
         _move(path, processed_dir, path.name)
+        if index is not None:
+            index.remove(f"inbox:{path.stem}")
+            page_file = inbox.wiki_path / rel
+            index_page_file(index, page_file, inbox.wiki_path)
         result.organized.append((str(path), rel))
     return result
 

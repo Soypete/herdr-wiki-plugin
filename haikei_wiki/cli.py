@@ -19,7 +19,9 @@ Usage:
 
 import argparse
 import json
+import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .adapter import LLMWikiAdapter
@@ -37,12 +39,24 @@ from .lifecycle import (
     LIFECYCLE_STATES,
     LifecycleError,
     page_status,
+    parse_frontmatter,
     supersede,
     withdraw,
 )
 from .organizer import OrganizerError, organize
+from .search_index import get_index, parse_since
 from .show import ShowError, show
 from .vocabulary import VocabularyViolation, load_vocabulary
+
+
+def page_category(text: str, page: Path) -> str:
+    """Frontmatter category for filters; falls back to the directory name."""
+    fields, _, _ = parse_frontmatter(text)
+    cat = str(fields.get("category", "")).strip()
+    if cat:
+        return cat
+    return page.parent.name if page.parent.name not in ("wiki", ".") else ""
+
 
 # Superseded/withdrawn pages still surface in search (the history is the point)
 # but rank below current ones and are labelled so a worker sees at a glance that
@@ -52,36 +66,183 @@ _STATUS_DOWNRANK = 0.5
 _CONF_ORDER = (CONF_LIKELY, CONF_POSSIBLY, CONF_JUDGMENT)
 
 
-def _search(query: str, top_k: int, as_json: bool, include_inbox: bool = True) -> int:
-    adapter = LLMWikiAdapter(wiki_root())
+def _search(
+    query: str,
+    top_k: int,
+    as_json: bool,
+    include_inbox: bool = True,
+    mode: str = "hybrid",
+    explain: bool = False,
+    type_filter: str | None = None,
+    since: str | None = None,
+    repo: str | None = None,
+) -> int:
+    root = wiki_root()
+
     # Pull a wider pool so status down-ranking can reorder before we truncate:
     # a superseded page must not displace a current one from the final top_k.
     pool = max(top_k * 3, top_k + 10)
-    results = adapter.search_memory(query, top_k=pool, include_inbox=include_inbox)
+
+    # Hybrid/FTS path: the local index is the fast, ranked retrieval source.
+    # The adapter scan is the fallback (no FTS5, or an empty index).
+    raw_results = None
+    search_meta = None
+    index = get_index(root)
+    if index is not None and index.fts_ok and index.doc_count() > 0:
+        raw, search_meta = index.search(query, mode=mode, top_k=pool)
+        hydrated = []
+        for path_str, score, breakdown in raw:
+            if path_str.startswith("inbox:"):
+                rid = path_str[6:]
+                m = root / "inbox" / f"{rid}.json"
+                if not m.is_file():
+                    continue  # index is stale on this record
+                try:
+                    record = json.loads(m.read_text())
+                except (OSError, json.JSONDecodeError):
+                    continue
+                hydrated.append(
+                    (
+                        rid,
+                        "inbox",
+                        f"inbox:{record.get('id', rid)}",
+                        str(record.get("title", "")),
+                        str(record.get("content", "")),
+                        str(record.get("created_at", "")),
+                        str(record.get("entity_type", "")),
+                        score,
+                        breakdown,
+                    )
+                )
+            else:
+                p = root / path_str
+                if not p.is_file():
+                    continue
+                # frontmatter category for filters
+                try:
+                    text = p.read_text()
+                except OSError:
+                    continue
+                cat = page_category(text, p)
+                src_m = re.search(r"^created:\s*(.+)$", text, re.M)
+                hydrated.append(
+                    (
+                        path_str,
+                        "page",
+                        str(p),
+                        p.stem,
+                        text,
+                        (src_m.group(1).strip().strip('"') if src_m else ""),
+                        cat,
+                        score,
+                        breakdown,
+                    )
+                )
+        raw_results = hydrated
+
+    if raw_results is None:
+        results = LLMWikiAdapter(root).search_memory(
+            query, top_k=pool, include_inbox=include_inbox
+        )
+        raw_results = []
+        for r in results:
+            if r.id.startswith("inbox:"):
+                rid = r.id[6:]
+                m = root / "inbox" / f"{rid}.json"
+                created = ""
+                etype = ""
+                try:
+                    record = json.loads(m.read_text())
+                    created = str(record.get("created_at", ""))
+                    etype = str(record.get("entity_type", ""))
+                except (OSError, json.JSONDecodeError):
+                    record = {}
+                raw_results.append(
+                    (
+                        rid,
+                        "inbox",
+                        r.id,
+                        str(record.get("title", "")),
+                        str(record.get("content", "")),
+                        created,
+                        etype,
+                        r.score,
+                        {},
+                    )
+                )
+            else:
+                p = Path(r.id)
+                text = ""
+                try:
+                    text = p.read_text()
+                except OSError:
+                    pass
+                cat = page_category(text, p)
+                src_m = re.search(r"^created:\s*(.+)$", text, re.M)
+                created = src_m.group(1).strip().strip('"') if src_m else ""
+                raw_results.append(
+                    (str(p), "page", r.id, p.stem, text, created, cat, r.score, {})
+                )
+
+    since_ts = parse_since(since) if since else None
     rows = []
-    for r in results:
+    for (
+        _key,
+        kind,
+        path_str,
+        title,
+        content,
+        created,
+        category,
+        score,
+        breakdown,
+    ) in raw_results:
+        if kind == "inbox" and not include_inbox:
+            continue
+        if type_filter and category.lower() != type_filter.lower():
+            continue
+        if since_ts:
+            if not created:
+                continue
+            try:
+                c = datetime.fromisoformat(created)
+                if c.tzinfo is None:
+                    c = c.replace(tzinfo=timezone.utc)
+                if c.timestamp() < since_ts:
+                    continue
+            except ValueError:
+                continue
+        if repo and repo.lower() not in (title + " " + content).lower():
+            continue
         status = ""
         # Only settled wiki pages carry frontmatter; inbox records do not.
-        if not r.id.startswith("inbox:") and not r.id.endswith("index.md"):
-            p = Path(r.id)
+        if kind == "page" and not path_str.endswith("index.md"):
+            p = Path(path_str)
             if p.is_file():
                 status = page_status(p)
-        score = r.score
         if status in LIFECYCLE_STATES:
             score *= _STATUS_DOWNRANK
-        rows.append(
-            {
-                "path": r.id,
-                "source": r.source,
-                "score": round(score, 3),
-                "snippet": " ".join(r.content.split())[:300],
-                "status": status,
-            }
-        )
+        row = {
+            "path": path_str,
+            "source": kind if kind == "inbox" else Path(path_str).name,
+            "score": round(score, 3),
+            "snippet": " ".join(content.split())[:300]
+            if kind == "page"
+            else " ".join(f"[inbox] {title}\n{content}".split())[:300],
+            "status": status,
+        }
+        if explain and breakdown:
+            row["scores"] = breakdown
+        rows.append(row)
     rows.sort(key=lambda x: x["score"], reverse=True)
     rows = rows[:top_k]
     if as_json:
-        print(json.dumps({"query": query, "results": rows}, indent=2))
+        payload = {"query": query, "results": rows}
+        if search_meta is not None:
+            payload["search"] = {
+                k: v for k, v in search_meta.items() if k != "requested_mode" or explain
+            }
+        print(json.dumps(payload, indent=2))
     else:
         if not rows:
             print(f"no results for {query!r}")
@@ -89,7 +250,8 @@ def _search(query: str, top_k: int, as_json: bool, include_inbox: bool = True) -
         print(f"{len(rows)} results for {query!r}")
         for row in rows:
             label = f" [{row['status']}]" if row["status"] else ""
-            print(f"[{row['score']:.2f}]{label} {row['path']}")
+            src = f" ({row['source']})" if explain else ""
+            print(f"[{row['score']:.2f}]{label}{src} {row['path']}")
             print(f"    {row['snippet']}")
     return 0
 
@@ -306,6 +468,29 @@ def main(argv=None) -> int:
         help="exclude pending inbox records (by default they are included)",
     )
     p_search.add_argument("--json", action="store_true")
+    p_search.add_argument(
+        "--mode",
+        choices=["hybrid", "lexical", "semantic"],
+        default="hybrid",
+        help="retrieval mode (default hybrid; degrades to lexical offline)",
+    )
+    p_search.add_argument(
+        "--explain",
+        action="store_true",
+        help="show per-result score breakdown (--json adds a search meta block)",
+    )
+    p_search.add_argument(
+        "--type",
+        help="filter by record type (claim, decision, handoff, …)",
+    )
+    p_search.add_argument(
+        "--since",
+        help="only records created within a window (24h, 7d) or after a date",
+    )
+    p_search.add_argument(
+        "--repo",
+        help="only records mentioning a repo (owner/name or name)",
+    )
 
     p_show = sub.add_parser(
         "show",
@@ -377,7 +562,17 @@ def main(argv=None) -> int:
 
     args = parser.parse_args(argv)
     if args.cmd == "search":
-        return _search(args.query, args.top_k, args.json, not args.no_inbox)
+        return _search(
+            args.query,
+            args.top_k,
+            args.json,
+            not args.no_inbox,
+            mode=args.mode,
+            explain=args.explain,
+            type_filter=args.type,
+            since=args.since,
+            repo=args.repo,
+        )
     if args.cmd == "show":
         return _show(args.spec, args.json)
     if args.cmd == "stats":

@@ -21,6 +21,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .context import Provenance
+from .search_index import index_capture_record
 from .vocabulary import Vocabulary, VocabularyViolation
 
 
@@ -130,6 +131,7 @@ class CaptureInbox:
 
         date = datetime.now().strftime("%Y-%m-%d")
         log_append(self.log_file, f"\n## [{date}] capture | {capture.title}")
+        index_capture_record(self.wiki_path, path)
         return path
 
     def pending(self) -> list[Path]:
