@@ -114,7 +114,11 @@ wiki reserve --repo owner/name --kind migration --value 074
 wiki audit [--collisions [--repo owner/name]]
 wiki stats
 wiki capture --title T --type T --content C [--link predicate:target ...]
-wiki organize
+wiki organize [--daemon]  # scheduled runner; see scripts/com.haikei.wiki-organize.plist (15-min launchd job, single-writer lock, run log in the state dir, no LLM calls)
+wiki migrate plan-vocabulary [--yes]  # opt-in: adds the plan entity type to an installed tbox.toml
+wiki plan status|active|complete|interrupt|archive <page>  # plan lifecycle; `status`/takeover lists open tasks of active or interrupted plans
+wiki migrate plan-vocabulary [--yes]
+wiki plan status|active|complete|interrupt|archive <page>
 wiki audit [--json] [--stale-days N]
 wiki delete page <path>
 wiki delete inbox <id>

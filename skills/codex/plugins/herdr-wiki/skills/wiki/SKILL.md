@@ -16,7 +16,8 @@ wiki search <query> [--top-k N] [--no-inbox] [--json]
 wiki show <page> [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link predicate:target ...]
-wiki organize
+wiki organize [--daemon]
+wiki plan status|active|complete|interrupt|archive <page>
 wiki audit [--json] [--stale-days N]
 wiki delete page <path>
 wiki delete inbox <id>
@@ -77,7 +78,8 @@ wiki search "duplicate handler implementations"    # check what is actually wire
 - Search surfaces **pending inbox records** (marked `inbox:`) alongside wiki
   pages by default, so you see another agent's unorganized captures; pass
   `--no-inbox` to see only settled pages. Search never modifies the inbox.
-- Captures land in an inbox; a human runs `wiki organize` to fold them into
+- Session plans have a lifecycle: `wiki plan status` lists active/interrupted plans with open tasks — the takeover surface for a new session; `wiki plan complete|interrupt|archive` moves them along.
+- Captures land in an inbox; a scheduled single-writer runner (`wiki organize --daemon`, launchd every 15 min) or a human `wiki organize` folds them into
   the interlinked graph. Do not edit wiki pages directly.
 - If `wiki` is not on PATH, run the shell launcher directly from the plugin repo:
   `/path/to/herdr-wiki-plugin/bin/wiki <args>`.

@@ -44,6 +44,8 @@ from .lifecycle import (
     supersede,
     withdraw,
 )
+from . import daemon as daemon_mod
+from . import plans as plans_mod
 from .organizer import OrganizerError, organize
 from .search_index import get_index, parse_since
 from .show import ShowError, show
@@ -419,7 +421,73 @@ def _capture(args) -> int:
     return 0
 
 
-def _organize() -> int:
+def _migrate(args) -> int:
+    """Opt-in migration: add the `plan` entity type to an installed tbox.toml."""
+    from .vocabulary import config_dir
+
+    cfg = config_dir() / "tbox.toml"
+    if not cfg.exists():
+        print(f"migrate: no installed vocabulary at {cfg}", file=sys.stderr)
+        return 2
+    text = cfg.read_text()
+    if re.search(r"^plan\s*=", text, re.M):
+        print("vocabulary already has the plan entity type; nothing to do")
+        return 0
+    if not args.yes:
+        print(
+            "This adds the `plan` entity type to "
+            f"{cfg} and is otherwise untouched. Re-run with --yes to apply."
+        )
+        return 0
+    if "[entity_types]" not in text:
+        print(f"migrate: {cfg} has no [entity_types] table", file=sys.stderr)
+        return 2
+    line = 'plan = "A session-scoped execution plan (task list, owners, status; issue #22)."'
+    text = text.replace("[entity_types]", f"[entity_types]\n{line}", 1)
+    cfg.write_text(text)
+    print(f"added plan entity type to {cfg}")
+    return 0
+
+
+def _plan(args) -> int:
+    if args.plan_cmd == "status":
+        rows = plans_mod.takeover(wiki_root())
+        if not rows:
+            print("no active or interrupted plans")
+            return 0
+        for r in rows:
+            tag = r["status"]
+            if r["status"] == "interrupted" and r["interrupt_reason"]:
+                tag += f" ({r['interrupt_reason']})"
+            print(f"{r['page']}  {tag}")
+            for t in r["open_tasks"]:
+                print(f"  [ ] {t}")
+        return 0
+    action = args.plan_cmd
+    if action is None:
+        print("usage: wiki plan status|active|complete|interrupt|archive <page>", file=sys.stderr)
+        return 2
+    if action not in ("status",):
+        try:
+            p = plans_mod.set_status(
+                args.page,
+                status=action,
+                wiki_path=wiki_root(),
+                reason=getattr(args, "reason", None),
+            )
+        except plans_mod.PlanError as e:
+            print(f"plan {action}: {e}", file=sys.stderr)
+            return 2
+        print(f"{p.name}: status={action}")
+    return 0
+
+
+def _organize(args=None) -> int:
+    if args is not None and getattr(args, "daemon", False):
+        interval = getattr(args, "interval", 0) or 0
+        if interval > 0:
+            return daemon_mod.loop(interval_seconds=interval)
+        return daemon_mod.run_once()
     try:
         result = organize()
     except OrganizerError as e:
@@ -656,7 +724,34 @@ def main(argv=None) -> int:
     p_cap.add_argument("--content", required=True)
     p_cap.add_argument("--link", action="append", help="predicate:target (repeatable)")
 
-    sub.add_parser("organize", help="reconcile the inbox into the wiki")
+    p_organize = sub.add_parser(
+        "organize", help="reconcile the inbox into the wiki"
+    )
+    p_organize.add_argument(
+        "--daemon",
+        action="store_true",
+        help="scheduled-runner mode: one locked pass, logged (for launchd)",
+    )
+    p_organize.add_argument(
+        "--interval",
+        type=int,
+        default=0,
+        metavar="SECONDS",
+        help="with --daemon: loop forever on this cadence (default 900 via launchd)",
+    )
+
+    p_migrate = sub.add_parser(
+        "migrate",
+        help="opt-in migrations (e.g. add the plan entity type to tbox.toml)",
+    )
+    p_migrate.add_argument("migration", nargs="?", default="", help="migration name (plan-vocabulary)")
+    p_migrate.add_argument("--yes", action="store_true", help="apply without prompting")
+
+    p_plan = sub.add_parser("plan", help="session plan lifecycle (active/completed/interrupted/archived)")
+    p_plan.add_argument("plan_cmd", nargs="?", default=None, choices=["status", "active", "complete", "interrupt", "archive"])
+    p_plan.add_argument("page", nargs="?", default=None, help="plan page (name under wiki/plan/)")
+    p_plan.add_argument("--reason", default=None, help="interrupt reason")
+
 
     p_audit = sub.add_parser(
         "audit",
@@ -744,7 +839,14 @@ def main(argv=None) -> int:
     if args.cmd == "capture":
         return _capture(args)
     if args.cmd == "organize":
-        return _organize()
+        return _organize(args)
+    if args.cmd == "migrate":
+        if args.migration and args.migration != "plan-vocabulary":
+            print(f"unknown migration: {args.migration}", file=sys.stderr)
+            return 2
+        return _migrate(args)
+    if args.cmd == "plan":
+        return _plan(args)
     if args.cmd == "audit":
         return _audit(args.json, args.stale_days, args.repo_dir, args.structural, getattr(args, "collisions", False), getattr(args, "col_repo", []))
     if args.cmd == "delete":
