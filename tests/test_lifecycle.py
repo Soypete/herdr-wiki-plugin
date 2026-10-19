@@ -1,5 +1,6 @@
 """Lifecycle: supersede / withdraw write only the status fields, never the body."""
 
+import json
 from pathlib import Path
 
 from haikei_wiki.lifecycle import (
@@ -101,3 +102,61 @@ def test_supersede_quotes_reason_with_colon_space(tmp_path):
     supersede(p, by="x", reason="see D-014: new keys only")
     fields, _, _ = parse_frontmatter(p.read_text())
     assert fields["reason"] == "see D-014: new keys only"
+
+
+# --- inbox JSON records (issue #13) ----------------------------------------
+
+
+def _inbox_record(wiki: Path, rid: str = "20261001T144448933485-62364054") -> Path:
+    inbox = wiki / "inbox"
+    inbox.mkdir(parents=True, exist_ok=True)
+    p = inbox / f"{rid}.json"
+    p.write_text(
+        json.dumps(
+            {
+                "id": rid,
+                "title": "fresh capture",
+                "entity_type": "claim",
+                "content": "pending capture body",
+                "links": [],
+                "provenance": {"agent": "test"},
+                "created_at": "2026-10-01T14:44:48",
+            }
+        )
+    )
+    return p
+
+
+def test_supersede_inbox_record_sets_json_not_frontmatter(tmp_path):
+    """The record must stay valid JSON: no YAML frontmatter prepended, or
+    organize rejects the record and loses the supersession (issue #13)."""
+    p = _inbox_record(tmp_path)
+    supersede(p, by="inbox/20261001T14533196721-test.json", reason="captured twice")
+
+    text = p.read_text()
+    assert not text.startswith("---"), "frontmatter must never land in a .json"
+    record = json.loads(text)
+    assert record["status"] == "superseded"
+    assert record["superseded_by"] == "inbox/20261001T14533196721-test.json"
+    assert record["reason"] == "captured twice"
+    assert record["id"] == "20261001T144448933485-62364054"
+
+
+def test_withdraw_inbox_record_sets_json(tmp_path):
+    p = _inbox_record(tmp_path)
+    withdraw(p, reason="was wrong when captured")
+    record = json.loads(p.read_text())
+    assert record["status"] == "withdrawn"
+    assert record["reason"] == "was wrong when captured"
+
+
+def test_supersede_inbox_corrupt_record_raises_not_mangles(tmp_path):
+    p = _inbox_record(tmp_path)
+    p.write_text("{ not json")
+    try:
+        supersede(p, by="x")
+        assert False, "expected LifecycleError"
+    except LifecycleError:
+        pass
+    # file untouched
+    assert p.read_text() == "{ not json"
