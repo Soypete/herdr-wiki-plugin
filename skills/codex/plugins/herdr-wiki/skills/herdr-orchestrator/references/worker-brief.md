@@ -36,7 +36,7 @@ Write each brief to `/tmp/briefs/<name>.md`, then send it with `herdr agent prom
 
 ## Environment
 - Repo/worktree: <path>   Branch: <branch>
-- Stack: <"new stack via gh stack init" | "gh stack add <branch> on top of <parent>" | "not stacked: gh pr create --base <base>">
+- Stack (plain, base-branch PR): `gh pr create --base <parent-branch> <branch>`. Never GitHub-native stacks (they block API merges/retargets).
 
 ## Done means
 1. Unit tests cover the change, including <specific cases>.
@@ -55,6 +55,18 @@ Do not merge.
 - If you are blocked: `wiki capture --type blocker ...`, then stop and say "BLOCKED: <one line>". Don't work around it.
 - Before finishing, capture a task-linked `handoff` summarizing wiki search queries (including empty results), decisions applied, atomic commits, PR URL, test results, and any loose ends.
 ```
+
+Every brief ends with this **footer** — the coordination terms the worker agrees to (issue #20):
+
+```markdown
+## Footer
+- **Files I own (claim):** <exact files/dirs from Scope — register with `wiki claim --repo <r> --paths '<globs>' --pr <n> --branch <b>` if the orchestrator has not>
+- **PR shape:** a plain base-branch PR (`gh pr create --base <parent-branch>`). No GitHub-native stacks: they block API merges and retargets.
+- **Review:** the PR body requests review from the owner; opening a non-draft PR ready for review is the definition of done — not "PR open".
+- **Scope discipline:** if I would touch a file outside my claim, stop and reply "OUT-OF-SCOPE: <file>" instead of editing it.
+```
+
+**One step per prompt for opencode workers.** opencode sessions drift when a brief gives context but not the exact single step — a one-line test fix once became 1.5h of rebase planning this way. Send one concrete step per prompt: file, line, expected value, and the test command (`<file>:<line>` — make X equal Y, then run Z). Interrupt (`esc`) with a smaller prompt if the worker has not pushed within N minutes.
 
 ## Worked example
 
@@ -76,7 +88,7 @@ Web clients currently log users out when the access token expires. This endpoint
 
 ## Environment
 - Worktree: ~/code/app-wt/auth-api   Branch: token-refresh-api
-- Stack: `gh stack init` — you are the bottom of the stack.
+- Stack (plain base-branch PR): `gh pr create --base main`.
 
 ## Done means
 1. Unit tests for: valid refresh, expired refresh token, reused (rotated-out) refresh token.

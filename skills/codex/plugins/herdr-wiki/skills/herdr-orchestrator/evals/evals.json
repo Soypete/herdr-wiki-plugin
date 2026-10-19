@@ -54,6 +54,58 @@
         "Does not merge or ask the worker to merge"
       ],
       "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "You are about to dispatch two parallel opencode workers in one repo. The plan shows both tasks touching skill directories SKILL.md and evals/evals.json, though for different skills. What do you do before dispatching?",
+      "expectations": [
+        "Computes each task's expected file set and checks wiki claims",
+        "Refuses parallel dispatch on the overlap",
+        "Chains the tasks as a plain base-branch PR sequence instead",
+        "Records the merge order in the wiki"
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "The bottom PR of a stack has just merged. The next PR's gh pr edit --base main fails: 'Cannot change the base branch because the pull request is part of a stack', and the merge API says it must be merged asynchronously. What did the skill do wrong, and what do you do now?",
+      "expectations": [
+        "Identifies GitHub-native stacks as the cause and says no native stacks should be created",
+        "Merges or unpicks using gh stack (checkout/unstack in a scratch worktree)",
+        "Retargets the remaining children to main after the parent merge",
+        "Commits to plain base-branch PRs for the rest of the effort"
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "All four self-hosted runners are busy and gates are queued. gh run list shows an in-progress run whose head branch belongs to a PR that was merged yesterday. What does the skill tell you to do now and during prevention?",
+      "expectations": [
+        "Cancels the stale run (scripts/cancel-stale-runs.sh) so gates unblock",
+        "Says gate jobs should carry timeout-minutes and a pull_request: closed trigger in the same concurrency group",
+        "Does not restart the merged branch's evals for no reason"
+      ],
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "A worker opened a non-draft PR, tests green, but the owner says it never showed up for review. gh pr edit --add-reviewer failed with a fine-grained token ('Resource not accessible by personal access token (organization.teams)'). What does the skill say?",
+      "expectations": [
+        "Uses the REST reviewer endpoint (POST requested_reviewers), via scripts/request-reviewers.sh",
+        "Verifies the PR actually lists the reviewer afterwards",
+        "Says the orchestrator tick re-requests reviewers on any non-draft, unapproved PR lacking one"
+      ],
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "You are about to clean up after a merge that returned HTTP 502, and the PR list page is slow. A cleanup script wants to delete the head branch. What does the skill say?",
+      "expectations": [
+        "Refuses to delete until state == MERGED is confirmed via gh pr view",
+        "Allows a delay/re-query for API lag",
+        "Says a premature delete closes an open PR and loses the branch"
+      ],
+      "files": []
     }
   ]
 }
