@@ -85,6 +85,13 @@ Run the file-overlap gate before any parallel dispatch (issue #20, observation 1
 - Register each dispatch as a claim: `wiki claim --repo <r> --paths '<globs>' --pr <n> --branch <b>`.
 - Re-check `wiki claims` on every re-plan; update claims when scope changes.
 
+Read the dispatch-capacity config at plan time (`$HERDR_PLUGIN_CONFIG_DIR/worker-capacity.toml`; schema in the plugin docs — issue #23):
+
+- **Refuse over-capacity dispatch.** Count active workers; if one more would exceed `parallel_capacity.max_workers` (per-repo override wins), do not dispatch — finish or stop a worker first.
+- **Steer task → harness/model from the config**, not from memory: the harness must be declared and enabled; the model = per-task override > harness default > fallback. Unknown harness or model = plan-time error.
+- **Name the model in the worker brief** ("running model X for task Y"). Dispatch with the model declared: headless (`codex exec --model`) or opencode 2.0's minimal TUI `opencode mini --model <provider/model>`. opencode sessions launched without the flag switch models only via Ctrl+P in the UI — for those the brief is the only place the model is set, so state it there.
+- **Absent config = today's behavior**: unlimited capacity, probe-and-adjust; do not error the plan over a missing file.
+
 **No native stacks.** GitHub-native stacked PRs block API merges and retargets ("must be merged using the asynchronous merge REST API"; "Cannot change the base branch because the pull request is part of a stack"). Use plain base-branch PRs at every level (`gh pr create --base <parent-branch>`), and right after a parent merges, retarget each child to main: `gh pr edit <child> --base main`.
 
 ### 3. Scaffold and dispatch

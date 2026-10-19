@@ -106,6 +106,18 @@
         "Says a premature delete closes an open PR and loses the branch"
       ],
       "files": []
+    },
+    {
+      "id": 11,
+      "title": "Capacity guard: refuse dispatch when parallel cap reached",
+      "input": "Plan three tasks but worker-capacity.toml says max_workers = 1 and one task is already claimed. Should the orchestrator dispatch the second task?",
+      "expected_skill_behavior": "No. Count active workers before each dispatch; if one more would exceed the capacity (global or per-repo), refuse with 'finish or stop one first'. Do not probe-and-adjust."
+    },
+    {
+      "id": 12,
+      "title": "Model steering from config: per-task override > harness default > fallback",
+      "input": "worker-capacity.toml defines quick=gpt-5-mini for codex, default=gpt-5-codex, fallback=claude-sonnet-4-5. What model does a 'quick' codex task get? What model does a 'large' claude task get (claude has no per-task overrides, default=claude-sonnet-4-5)?",
+      "expected_skill_behavior": "quick/codex \u2192 gpt-5-mini (per-task wins). large/claude \u2192 claude-sonnet-4-5 (harness default). An unknown task-type for claude \u2192 claude-sonnet-4-5 (still harness default). For a harness with no default \u2192 fallback. Interactive harnesses without {model} in command: model is advisory, stated in brief, not enforced by launch."
     }
   ]
 }

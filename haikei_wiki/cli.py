@@ -422,7 +422,7 @@ def _capture(args) -> int:
 
 
 def _migrate(args) -> int:
-    """Opt-in migration: add the `plan` entity type to an installed tbox.toml."""
+    """Opt-in migrations: plan vocabulary, worker-capacity config."""
     from .vocabulary import config_dir
 
     cfg = config_dir() / "tbox.toml"
@@ -447,6 +447,18 @@ def _migrate(args) -> int:
     cfg.write_text(text)
     print(f"added plan entity type to {cfg}")
     return 0
+
+
+def _migrate_worker_capacity(args) -> int:
+    """Write the commented worker-capacity example (no-op if present)."""
+    from . import workers_config
+
+    if args.migration == "worker-capacity":
+        existed = workers_config.config_path().exists()
+        p = workers_config.write_example()
+        print(f"capacity config: {p}" + (" (already present)" if existed else " (example written)"))
+        return 0
+    raise AssertionError("unreachable")
 
 
 def _plan(args) -> int:
@@ -841,8 +853,13 @@ def main(argv=None) -> int:
     if args.cmd == "organize":
         return _organize(args)
     if args.cmd == "migrate":
+        if args.migration == "worker-capacity":
+            return _migrate_worker_capacity(args)
         if args.migration and args.migration != "plan-vocabulary":
-            print(f"unknown migration: {args.migration}", file=sys.stderr)
+            print(
+                "unknown migration: {0} (known: plan-vocabulary, worker-capacity)".format(args.migration),
+                file=sys.stderr,
+            )
             return 2
         return _migrate(args)
     if args.cmd == "plan":
