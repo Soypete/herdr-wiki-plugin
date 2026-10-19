@@ -106,6 +106,7 @@ The ready-to-paste block is in [`../agent-instructions.md`](../agent-instruction
 
 ```
 wiki search <query> [--top-k N] [--no-inbox] [--json]
+wiki show <page> [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link predicate:target ...]
 wiki organize
@@ -117,6 +118,10 @@ wiki delete inbox <id>
 Search includes pending inbox records by default (marked `inbox:` in results)
 so agents can see each other's unorganized captures; `--no-inbox` limits the
 search to settled wiki pages. Search never modifies the inbox.
+
+`wiki show <page>` prints a full page or inbox record (agents should use it
+instead of reading wiki files directly); `--json` returns
+`{path, title, category, created, content, links}`.
 
 `wiki audit` is read-only: scans for orphans, broken links, unindexed pages,
 empty pages, and stale inbox records. `wiki delete` requires an exact path or
