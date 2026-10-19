@@ -313,3 +313,16 @@ def test_run_audit_known_repo_no_false_unknown(tmp_path):
     report = run_audit(wiki, stale_days=7, repos={"kei": repo_root})
     unknown = [f for f in report.findings if "unknown repo" in f.evidence]
     assert len(unknown) == 0
+
+
+def test_discover_repos_resolves_renamed_alias_directory(tmp_path):
+    """A repo checked out under its post-rename directory (Kei-Chat-Harness,
+    formerly pedro-tag) must be discovered and registered under the canonical
+    token pages use, so citations in those pages still resolve (issue #6)."""
+    import haikei_wiki.audit as audit
+
+    root = tmp_path / "repos"
+    _git_repo(root, "Kei-Chat-Harness", files={"cmd/server/main.go": "package main\n"})
+    repos = audit.discover_repos(extra_dirs=[str(root)])
+    assert "pedro-tag" in repos
+    assert (repos["pedro-tag"] / "cmd/server/main.go").is_file()
