@@ -24,6 +24,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import claims as claims_mod
 from .adapter import LLMWikiAdapter
 from .audit import (
     CONF_JUDGMENT,
@@ -256,6 +257,110 @@ def _search(
     return 0
 
 
+def _claim(args) -> int:
+    paths = [g for g in (args.paths or "").split(",") if g.strip()]
+    try:
+        c = claims_mod.create_claim(
+            repo=args.repo,
+            paths=paths,
+            branch=args.branch,
+            pr=args.pr or 0,
+            owner=args.owner or "",
+            expires=args.expires,
+        )
+    except claims_mod.ClaimError as e:
+        print(f"claim: {e}", file=sys.stderr)
+        return 2
+    print(c.id)
+    return 0
+
+
+def _reserve(args) -> int:
+    try:
+        c = claims_mod.create_reservation(
+            repo=args.repo,
+            sequence_kind=args.kind,
+            value=args.value,
+            owner=args.owner or "",
+        )
+    except claims_mod.ClaimError as e:
+        print(f"reserve: {e}", file=sys.stderr)
+        return 2
+    print(c.id)
+    return 0
+
+
+def _release(claim_id: str) -> int:
+    try:
+        claims_mod.release(claim_id)
+    except claims_mod.ClaimError as e:
+        print(f"release: {e}", file=sys.stderr)
+        return 2
+    print(f"released {claim_id}")
+    return 0
+
+
+def _claims_list(args) -> int:
+    active, overlaps = claims_mod.list_claims(repo=args.repo or None, paths=args.paths)
+    if args.json:
+        print(json.dumps({"claims": active, "overlaps": overlaps}, indent=2))
+        return 0
+    if not active:
+        print("no active claims")
+        return 0
+    for c in active:
+        span = (
+            ",".join(c.get("paths", []))
+            or f"{c.get('sequence_kind')}={c.get('value')}"
+        )
+        meta = []
+        if c.get("pr"):
+            meta.append(f"pr #{c['pr']}")
+        if c.get("branch"):
+            meta.append(c["branch"])
+        if c.get("owner"):
+            meta.append(c["owner"])
+        suffix = f" ({', '.join(meta)})" if meta else ""
+        print(f"{c['id']}  {c['kind']:<12} {c['repo']}  {span}{suffix}")
+    for o in overlaps:
+        if o["kind"] == "path_overlap":
+            print(
+                f"OVERLAP {o['repo']} {o['claims'][0]} vs {o['claims'][1]} on {o['paths']}",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"CONFLICT {o['repo']} {o['claims'][0]} vs {o['claims'][1]} on {o['sequence']}",
+                file=sys.stderr,
+            )
+    return 0
+
+
+def _collisions(args) -> int:
+    report, notes = claims_mod.collisions(repos=args.repo or None)
+    if args.json:
+        print(json.dumps({"collisions": report, "notes": notes}, indent=2))
+        return 0
+    if not report:
+        print("no active claims or PR data; nothing to diff")
+        return 0
+    for repo, row in report.items():
+        print(f"{repo}: {row['claims']} active path/reservation claims")
+        for o in row["overlapping_claims"]:
+            print(f"  OVERLAP {o['claims']} on {o.get('paths', [])}")
+        if row["unclaimed_prs"]:
+            print(f"  open PRs with no claim:")
+            for u in row["unclaimed_prs"]:
+                print(f"    #{u['number']} ({u['branch']}) touches {u['files']} files")
+        for c in row["claims_vs_pr"]:
+            print(f"  #{c['number']} claims {c['claim']} but also touches unclaimed:")
+            for f in c["unclaimed_files"]:
+                print(f"    {f}")
+    for n in notes:
+        print(f"note: {n}")
+    return 0
+
+
 def _show(spec: str, as_json: bool) -> int:
     try:
         page = show(spec)
@@ -328,7 +433,18 @@ def _organize() -> int:
     return 0
 
 
-def _audit(as_json: bool, stale_days: float, repo_dirs: list, structural: bool) -> int:
+def _audit(
+    as_json: bool,
+    stale_days: float,
+    repo_dirs: list,
+    structural: bool,
+    collisions: bool = False,
+    col_repo: list | None = None,
+) -> int:
+    if collisions:
+        return _collisions(
+            type("C", (), {"json": as_json, "repo": col_repo})()
+        )
     if structural:
         report = structural_audit(wiki_root(), stale_days=int(stale_days))
         if as_json:
@@ -503,6 +619,34 @@ def main(argv=None) -> int:
     )
     p_show.add_argument("--json", action="store_true", help="structured output")
 
+    p_claim = sub.add_parser(
+        "claim", help="register a path-level claim for a PR/branch (issue #10)"
+    )
+    p_claim.add_argument("--repo", required=True, help="owner/name")
+    p_claim.add_argument("--paths", required=True, help="comma-separated globs")
+    p_claim.add_argument("--branch", default="")
+    p_claim.add_argument("--pr", type=int, default=0)
+    p_claim.add_argument("--owner", default="", help="orchestrator/worker id")
+    p_claim.add_argument("--expires", default="24h")
+
+    p_release = sub.add_parser("release", help="release a claim id")
+    p_release.add_argument("claim_id")
+
+    p_claims = sub.add_parser(
+        "claims", help="list active claims and flag overlaps"
+    )
+    p_claims.add_argument("--repo", default="")
+    p_claims.add_argument("--paths", default="")
+    p_claims.add_argument("--json", action="store_true")
+
+    p_reserve = sub.add_parser(
+        "reserve", help="reserve a shared sequence value (migration, eval-case, ...)"
+    )
+    p_reserve.add_argument("--repo", required=True)
+    p_reserve.add_argument("--kind", required=True)
+    p_reserve.add_argument("--value", required=True)
+    p_reserve.add_argument("--owner", default="")
+
     p_stats = sub.add_parser("stats", help="wiki statistics")
     p_stats.add_argument("--json", action="store_true")
 
@@ -530,6 +674,18 @@ def main(argv=None) -> int:
         action="append",
         default=[],
         help="extra directory to search for a repo (repeatable)",
+    )
+    p_audit.add_argument(
+        "--collisions",
+        action="store_true",
+        help="diff open PRs against active claims (overlaps, unclaimed PRs)",
+    )
+    p_audit.add_argument(
+        "--repo",
+        dest="col_repo",
+        action="append",
+        default=[],
+        help="with --collisions: restrict to these repos (repeatable)",
     )
     p_audit.add_argument(
         "--structural",
@@ -573,6 +729,14 @@ def main(argv=None) -> int:
             since=args.since,
             repo=args.repo,
         )
+    if args.cmd == "claim":
+        return _claim(args)
+    if args.cmd == "reserve":
+        return _reserve(args)
+    if args.cmd == "release":
+        return _release(args.claim_id)
+    if args.cmd == "claims":
+        return _claims_list(args)
     if args.cmd == "show":
         return _show(args.spec, args.json)
     if args.cmd == "stats":
@@ -582,7 +746,7 @@ def main(argv=None) -> int:
     if args.cmd == "organize":
         return _organize()
     if args.cmd == "audit":
-        return _audit(args.json, args.stale_days, args.repo_dir, args.structural)
+        return _audit(args.json, args.stale_days, args.repo_dir, args.structural, getattr(args, "collisions", False), getattr(args, "col_repo", []))
     if args.cmd == "delete":
         return _delete(args)
     if args.cmd == "supersede":

@@ -107,6 +107,11 @@ The ready-to-paste block is in [`../agent-instructions.md`](../agent-instruction
 ```
 wiki search <query> [--top-k N] [--no-inbox] [--json] [--mode hybrid|lexical|semantic] [--explain] [--type T] [--since 24h] [--repo owner/name]
 wiki show <page> [--json]
+wiki claim --repo owner/name --paths '<glob[,glob]>' [--branch b] [--pr n] [--owner o] [--expires 24h]
+wiki release <claim-id>
+wiki claims [--repo r] [--paths glob] [--json]
+wiki reserve --repo owner/name --kind migration --value 074
+wiki audit [--collisions [--repo owner/name]]
 wiki stats
 wiki capture --title T --type T --content C [--link predicate:target ...]
 wiki organize
@@ -123,13 +128,23 @@ search to settled wiki pages. Search never modifies the inbox.
 instead of reading wiki files directly); `--json` returns
 `{path, title, category, created, content, links}`.
 
+Cross-orchestrator collisions have a structured form (issue #10): `wiki
+claim` registers path-level claims ("PR X owns dir A until merged"),
+`wiki reserve` pins shared sequence values (migration numbers, eval-case
+ids), `wiki claims` lists active claims and flags overlaps, and `wiki
+audit --collisions` diffs open PRs (via `gh`) against the claims —
+unclaimed PRs and claims whose PR also touches unclaimed files are
+reported. Claims expire (default 24h); `wiki release <id>` frees paths
+at merge time. A `wiki sync` shared backend for cross-machine
+orchestrators is a follow-up.
+
 Search is **hybrid** by default: a local FTS5 (BM25) index is kept
 incrementally by `capture`/`organize`/`delete` and combined (reciprocal rank
 fusion) with semantic embeddings when a provider is configured
 (`WIKI_EMBED_MODEL`, optionally `WIKI_EMBED_URL` for an OpenAI-compatible
 /Ollama-style endpoint on the tailnet). Without one it degrades to
 lexical-only, offline. `--mode` pins `lexical`/`semantic`; `--explain`
-(untext/json) adds per-result score breakdowns; `--type`, `--since`, and
+(text/json) adds per-result score breakdowns; `--type`, `--since`, and
 `--repo` narrow results for orchestrator queries.
 
 `wiki audit` is read-only: scans for orphans, broken links, unindexed pages,
