@@ -10,7 +10,7 @@ I started using a shared wiki as the durable memory between these sessions. Herd
 
 The capture flow is useful because another session can see a new note before it has been folded into the wiki's organized pages. A capture lands as JSON in a shared inbox and is immediately searchable with an `inbox:` label. Search doesn't mutate it; a single organize step turns accepted captures into linked pages. Deletions are recorded in `log.md`, which gives us a way to verify what was actually removed instead of counting a request as an action.
 
-Search itself is straightforward text retrieval: it scans wiki pages and the index case-insensitively, and includes pending inbox records by default. Title matches rank above body matches, and superseded records remain searchable but are down-ranked. That makes the system easy to inspect, while reminding me to use the terms another session is likely to search for.
+Search is tokenized and ranked rather than a plain substring scan: it scans wiki pages and the index, includes pending inbox records by default, and ranks how many query terms a record matches, with title hits above body hits and superseded records down-ranked. A full record is reachable through the CLI (`wiki show inbox:<id>`), so a worker never needs to read wiki files with a file tool. That makes the system easy to inspect, while reminding me to use the terms another session is likely to search for.
 
 The protocol is practical: search before changing shared code; give each worker a narrow brief with explicit files and a done condition; capture decisions and contract changes; tell affected workers to read them; and put dependent PRs into a stack with one owner. Quick nudges stay in the worker's pane. Information the next worker will need goes in the wiki.
 
