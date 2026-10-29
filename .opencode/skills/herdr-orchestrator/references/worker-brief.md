@@ -60,10 +60,11 @@ Every brief ends with this **footer** — the coordination terms the worker agre
 
 ```markdown
 ## Footer
-- **Files I own (claim):** <exact files/dirs from Scope — register with `wiki claim --repo <r> --paths '<globs>' --pr <n> --branch <b>` if the orchestrator has not>
+- **Files I own (claim):** <exact files/dirs from Scope>. Register them yourself before editing, per the wiki skill (*Claims and reservations*): `wiki claims --repo <r> --paths '<globs>'` first, then `wiki claim --repo <r> --paths '<globs>' --pr <n> --branch <b> --owner <your name> --expires 7d`, and `wiki release <id>` when the PR merges. For any ordered value (migration number, eval-case id) use `wiki reserve` BEFORE writing the file; the next free value is: <value>.
 - **PR shape:** a plain base-branch PR (`gh pr create --base <parent-branch>`). No GitHub-native stacks: they block API merges and retargets.
 - **Review:** the PR body requests review from the owner; opening a non-draft PR ready for review is the definition of done — not "PR open".
 - **Scope discipline:** if I would touch a file outside my claim, stop and reply "OUT-OF-SCOPE: <file>" instead of editing it.
+- **Coordination:** your only coordination tools are `wiki claim`/`reserve`/`release` and `wiki capture`. Do not message other workers and do not reorder anything. If your claim overlaps another or a number is already taken, capture a `blocker`, say "BLOCKED: <one line>", and wait for the orchestrator.
 ```
 
 **One step per prompt for opencode workers.** opencode sessions drift when a brief gives context but not the exact single step — a one-line test fix once became 1.5h of rebase planning this way. Send one concrete step per prompt: file, line, expected value, and the test command (`<file>:<line>` — make X equal Y, then run Z). Interrupt (`esc`) with a smaller prompt if the worker has not pushed within N minutes.
