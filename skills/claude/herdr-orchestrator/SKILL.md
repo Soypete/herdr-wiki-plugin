@@ -26,6 +26,7 @@ When a worker struggles, the first fix is almost always a better scaffold (sharp
 4. **You own end-to-end tests.** Run them yourself (in a pane you create) against the stack top once the relevant PRs are open. Failures become new worker tasks.
 5. **Three strikes, then escalate.** A task gets at most 3 attempts (see *Failure handling*). After the third, record a blocker in the wiki and stop to ask the user.
 6. **Durable → wiki. Transient → herdr.** Anything another agent (or a future session) needs goes in the wiki. Quick nudges and answers go straight to the pane.
+7. **You watch collisions; workers only claim and capture.** Coordination is your job, not theirs: you read the wiki's claims, reservations and captures, spot overlaps, and tell the affected workers what to do. Workers do exactly two things for coordination, `wiki claim`/`wiki reserve`/`wiki release` and `wiki capture`, as described in the **wiki skill**. They do not message each other and do not decide ordering.
 
 ## Worker context and Git requirements
 
@@ -33,6 +34,23 @@ When a worker struggles, the first fix is almost always a better scaffold (sharp
 - Each worker owns a worktree, makes small logical atomic commits, runs tests, and uses `gh stack` for dependent PRs; only use plain PR fallback if `gh stack` is unavailable. Humans merge.
 - For OpenCode workers configured with 100K context, aim to checkpoint durable state at 60-70K and compact/restart before 80K, with wiki references and Git commits. Never treat 100K as the normal operating target.
 - Maintain plan state in wiki; on successful completion archive the plan, on crashes/rate limits preserve incomplete work for takeover. Do not discard unfinished session plans.
+
+## The orchestrator's job: watch collisions and inform the workers
+
+How to use the commands (`claim`, `claims`, `release`, `reserve`, `capture`, `audit --collisions`) is in the **wiki skill**; this skill does not repeat it. Read that skill before dispatching, and point every worker at it.
+
+**Workers (the wiki skill's "Claims and reservations")**
+- claim the paths they edit (`wiki claim`), reserve ordered values such as migration numbers (`wiki reserve`), release both when the PR merges or is abandoned;
+- capture handoffs, blockers, contract changes and acks (`wiki capture`);
+- on an overlap or a stale number they stop, capture a `blocker`, and wait for your instruction. They never message other workers or reorder anything themselves.
+
+**You, the orchestrator**
+- **Every tick, and before every dispatch, ready or merge**, run the collision checks: `wiki audit --collisions --repo <each repo in play>` (overlapping claims, open PRs touching unclaimed paths, `reservation_conflict`), `wiki claims --repo <r>`, and `wiki search "<topic>" --since <last tick> --type blocker|contract_change|handoff|ack` for what changed since you last looked. In Claude Code put this in the `/loop` tick; elsewhere run it on each watcher event.
+- **Inform the workers.** For each collision, prompt the affected worker(s) with the exact overlap and the instruction: chain after PR X, wait for Y to merge, merge main into your branch, renumber to the next free value, or release a stale claim. A good message names the files or the number and the action; it never just says "conflict".
+- **Own the order.** Decide which PR goes first, record it in the wiki as a decision, and release the holds as merges happen. Workers learn the order from your prompt and the wiki, not from each other.
+- **Tell other orchestrators.** Before a large batch of merges moves shared files, capture a `contract_change` heads-up naming the hot files, the merge order and the claims that matter, and ask affected orchestrators to `ack`. After each batch, capture a note with the final main SHA.
+- **Keep the ledger honest.** Notice claims that outlive their PRs (claims expire after 24 h by default, merged PRs leave stale ones) and reservations with no live PR. Release your own; for another orchestrator's stale claim, ask its owner in the wiki instead of releasing it.
+- **Do not claim for the workers' benefit by guessing.** If a task's file set is unclear, make it a planning question, not a broad claim.
 
 ## Preflight
 
@@ -81,8 +99,8 @@ Run the file-overlap gate before any parallel dispatch (issue #20, observation 1
 
 - For each task, write down its expected file set (paths touched). `wiki claims --json` shows what every orchestrator already holds (`wiki claim` / `wiki reserve` register what this effort takes).
 - **Refuse parallel dispatch when two tasks, or a task and an active claim, overlap on any path.** Chain them instead: they become a plain base-branch PR sequence (one worker owns the chain, in order) and the merge order is recorded in the wiki.
-- Shared sequences (migration numbers, eval-case ids) get wiki reservations before a task claims one: `wiki reserve --repo <r> --kind migration --value 074`.
-- Register each dispatch as a claim: `wiki claim --repo <r> --paths '<globs>' --pr <n> --branch <b>`.
+- Shared sequences (migration numbers, eval-case ids) get a wiki reservation **by the worker, before it writes the file** (see the wiki skill: *Claims and reservations*); name the sequence and the next free value in the brief.
+- Each worker registers its own claim with the file set you gave it; you verify the claim exists before you consider the task started.
 - Re-check `wiki claims` on every re-plan; update claims when scope changes.
 
 Read the dispatch-capacity config at plan time (`$HERDR_PLUGIN_CONFIG_DIR/worker-capacity.toml`; schema in the plugin docs — issue #23):
