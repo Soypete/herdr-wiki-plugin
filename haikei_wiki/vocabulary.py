@@ -13,11 +13,17 @@ or coerced to a default.
 
 import os
 import shutil
+import sys
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
 STARTER_TBOX = Path(__file__).resolve().parent / "starter_tbox.toml"
+
+# The plugin id herdr names config/state dirs by (herdr-plugin.toml).
+PLUGIN_ID = "herdr.wiki"
+# Pre-rename id: existing installs have their config under this name.
+LEGACY_PLUGIN_ID = "haikei.wiki"
 
 
 class VocabularyViolation(ValueError):
@@ -75,19 +81,55 @@ def config_dir() -> Path:
     d = os.environ.get("HERDR_PLUGIN_CONFIG_DIR")
     if d:
         return Path(d)
-    return Path.home() / ".config" / "herdr" / "plugins" / "haikei.wiki"
+    return Path.home() / ".config" / "herdr" / "plugins" / PLUGIN_ID
+
+
+def legacy_config_dir() -> Path:
+    """The pre-rename per-id config dir, a sibling of the current one.
+
+    herdr names each plugin's config dir by its plugin id, so the id rename
+    moved the directory: the legacy dir sits next to the new one under the
+    same parent (whether that parent is ~/.config/herdr/plugins or whatever
+    HERDR_PLUGIN_CONFIG_DIR points at).
+    """
+    return config_dir().parent / LEGACY_PLUGIN_ID
+
+
+def vocabulary_path() -> Path:
+    """Locate tbox.toml, falling back to a legacy haikei.wiki config dir.
+
+    After the id rename the config dir moved. Until the user moves their
+    tbox.toml over, keep reading the legacy file and print a one-line hint
+    to stderr. Never copy or delete the user's files: migration is a human
+    decision (README, 'Migrating from haikei.wiki').
+    """
+    tbox = config_dir() / "tbox.toml"
+    if tbox.exists():
+        return tbox
+    legacy = legacy_config_dir() / "tbox.toml"
+    if legacy.exists():
+        print(
+            f"{PLUGIN_ID}: no tbox.toml in this config dir; using the legacy "
+            f"{legacy} - move it to {tbox} (README: 'Migrating from "
+            f"{LEGACY_PLUGIN_ID}')",
+            file=sys.stderr,
+        )
+        return legacy
+    return tbox
 
 
 def seed_config_dir() -> Path:
     """Ensure the config dir exists and contains tbox.toml.
 
     Seeds the shipped starter vocabulary on first run. Never overwrites an
-    existing tbox.toml - schema changes are a human decision.
+    existing tbox.toml - schema changes are a human decision. Skipped while
+    a legacy haikei.wiki vocabulary exists: seeding a fresh starter here
+    would shadow the user's customized legacy file.
     """
     d = config_dir()
     d.mkdir(parents=True, exist_ok=True)
     tbox = d / "tbox.toml"
-    if not tbox.exists():
+    if not tbox.exists() and not (legacy_config_dir() / "tbox.toml").exists():
         shutil.copyfile(STARTER_TBOX, tbox)
     return d
 
@@ -95,7 +137,7 @@ def seed_config_dir() -> Path:
 def load_vocabulary(path: Path | None = None) -> Vocabulary:
     if path is None:
         seed_config_dir()
-        path = config_dir() / "tbox.toml"
+        path = vocabulary_path()
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"capture vocabulary not found: {path}")
