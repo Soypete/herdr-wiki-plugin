@@ -110,6 +110,7 @@ Then the commands are:
 
 ```
 wiki search <query> [--top-k N] [--no-inbox] [--json]
+wiki inbox [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link p:t ...]
 wiki organize
@@ -117,6 +118,8 @@ wiki audit [--json] [--stale-days N]
 wiki delete page <path>
 wiki delete inbox <id>
 ```
+
+`wiki inbox [--json]` lists pending captures, newest first.
 
 ### Per-agent skills
 

@@ -50,6 +50,56 @@ def test_cli_capture_valid_lands_in_inbox(tmp_path, monkeypatch):
     assert rec["links"] == [{"predicate": "derived_from", "target": "imported/x"}]
 
 
+def test_cli_inbox_lists_pending_records_newest_first(tmp_path, monkeypatch, capsys):
+    wiki = _isolate(tmp_path, monkeypatch)
+    inbox = wiki / "inbox"
+    inbox.mkdir()
+    records = [
+        {
+            "id": "older-1",
+            "title": "Older capture",
+            "entity_type": "claim",
+            "content": "older body",
+            "created_at": "2026-11-14T10:00:00",
+        },
+        {
+            "id": "newer-1",
+            "title": "Newer capture",
+            "entity_type": "decision",
+            "content": "newer body",
+            "created_at": "2026-11-15T10:00:00",
+        },
+    ]
+    for record in records:
+        (inbox / f"{record['id']}.json").write_text(json.dumps(record))
+    processed = inbox / "processed"
+    processed.mkdir()
+    (processed / "settled.json").write_text(json.dumps(records[0]))
+
+    rc = cli.main(["inbox", "--json"])
+    data = json.loads(capsys.readouterr().out)
+
+    assert rc == 0
+    assert [row["path"] for row in data["results"]] == [
+        "inbox:newer-1",
+        "inbox:older-1",
+    ]
+    assert [row["source"] for row in data["results"]] == ["inbox", "inbox"]
+    assert data["results"][0]["title"] == "Newer capture"
+    assert data["results"][0]["entity_type"] == "decision"
+    assert "newer body" in data["results"][0]["snippet"]
+
+
+def test_cli_inbox_empty_json_has_no_results(tmp_path, monkeypatch, capsys):
+    _isolate(tmp_path, monkeypatch)
+
+    rc = cli.main(["inbox", "--json"])
+    data = json.loads(capsys.readouterr().out)
+
+    assert rc == 0
+    assert data["results"] == []
+
+
 def test_cli_capture_out_of_vocabulary_rejected(tmp_path, monkeypatch):
     wiki = _isolate(tmp_path, monkeypatch)
     rc = cli.main(

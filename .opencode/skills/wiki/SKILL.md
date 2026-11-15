@@ -13,6 +13,7 @@ them in your context.
 
 ```
 wiki search <query> [--top-k N] [--no-inbox] [--json]
+wiki inbox [--json]
 wiki show <page> [--json]
 wiki stats
 wiki capture --title T --type T --content C [--link predicate:target ...]
