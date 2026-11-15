@@ -35,7 +35,7 @@ Verify it registered:
 
 ```
 herdr plugin list
-herdr plugin action list --plugin haikei.wiki
+herdr plugin action list --plugin herdr.wiki
 ```
 
 ## How to run it
@@ -56,10 +56,10 @@ herdr plugin action list --plugin haikei.wiki
 ### Actions (CLI)
 
 ```
-herdr plugin action invoke haikei.wiki.search        # open the search popup
-herdr plugin action invoke haikei.wiki.capture       # open the capture popup
-herdr plugin action invoke haikei.wiki.organize      # reconcile inbox -> wiki
-herdr plugin action invoke haikei.wiki.context-dump  # debug: print plugin env + provenance
+herdr plugin action invoke herdr.wiki.search        # open the search popup
+herdr plugin action invoke herdr.wiki.capture       # open the capture popup
+herdr plugin action invoke herdr.wiki.organize      # reconcile inbox -> wiki
+herdr plugin action invoke herdr.wiki.context-dump  # debug: print plugin env + provenance
 ```
 
 ### Drive a capture from a pane (non-interactive)
@@ -68,7 +68,7 @@ The capture popup runs non-interactively when these env vars are set — this
 is how captures are scripted from a pane:
 
 ```
-herdr plugin pane open --plugin haikei.wiki --entrypoint capture \
+herdr plugin pane open --plugin herdr.wiki --entrypoint capture \
   --env WIKI_CAPTURE_TITLE="my note" \
   --env WIKI_CAPTURE_TYPE=claim \
   --env WIKI_CAPTURE_CONTENT="the content to capture" \
@@ -86,7 +86,7 @@ herdr plugin pane open --plugin haikei.wiki --entrypoint capture \
    pending records are marked `inbox:` in results. `--no-inbox` limits the
    search to settled pages. Search is read-only: it never organizes, moves,
    or mutates inbox records.
-3. **Organize** (`herdr plugin action invoke haikei.wiki.organize`) is the
+3. **Organize** (`herdr plugin action invoke herdr.wiki.organize`) is the
    single writer to the graph: it turns each inbox record into a page under
    `<wiki>/wiki/<type>/`, updates `<wiki>/index.md`, appends to `log.md`, and
    moves the record to `inbox/processed/` (or `inbox/rejected/`).
@@ -213,7 +213,7 @@ skills above. (You can use both: the skill for on-demand loading, the
 Find your config dir with:
 
 ```
-herdr plugin config-dir haikei.wiki
+herdr plugin config-dir herdr.wiki
 ```
 
 ### The closed capture vocabulary
@@ -277,7 +277,7 @@ tests/                   # pytest suite
 
 ```
 herdr plugin link /path/to/herdr-wiki-plugin
-herdr plugin action list --plugin haikei.wiki
+herdr plugin action list --plugin herdr.wiki
 
 cd tests && python3 -m pytest -v
 ```

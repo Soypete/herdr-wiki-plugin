@@ -10,7 +10,7 @@ import _bootstrap  # noqa: F401
 from haikei_wiki.context import parse_provenance
 from haikei_wiki.herdr import run
 
-PLUGIN_ID = "haikei.wiki"
+PLUGIN_ID = "herdr.wiki"
 
 
 def main() -> int:
