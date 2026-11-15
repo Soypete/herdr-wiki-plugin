@@ -1,4 +1,4 @@
-"""haikei_wiki - capture/organize logic for the haikei.wiki Herdr plugin.
+"""haikei_wiki - capture/organize logic for the herdr.wiki Herdr plugin.
 
 Thin logic layer over the existing LLMWikiAdapter. The plugin manifest
 (plugin/herdr-plugin.toml) only wires this package into Herdr surfaces.

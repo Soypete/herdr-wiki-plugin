@@ -35,7 +35,7 @@ Verify it registered:
 
 ```
 herdr plugin list
-herdr plugin action list --plugin haikei.wiki
+herdr plugin action list --plugin herdr.wiki
 ```
 
 ## How to run it
@@ -56,10 +56,10 @@ herdr plugin action list --plugin haikei.wiki
 ### Actions (CLI)
 
 ```
-herdr plugin action invoke haikei.wiki.search        # open the search popup
-herdr plugin action invoke haikei.wiki.capture       # open the capture popup
-herdr plugin action invoke haikei.wiki.organize      # reconcile inbox -> wiki
-herdr plugin action invoke haikei.wiki.context-dump  # debug: print plugin env + provenance
+herdr plugin action invoke herdr.wiki.search        # open the search popup
+herdr plugin action invoke herdr.wiki.capture       # open the capture popup
+herdr plugin action invoke herdr.wiki.organize      # reconcile inbox -> wiki
+herdr plugin action invoke herdr.wiki.context-dump  # debug: print plugin env + provenance
 ```
 
 ### Drive a capture from a pane (non-interactive)
@@ -68,7 +68,7 @@ The capture popup runs non-interactively when these env vars are set — this
 is how captures are scripted from a pane:
 
 ```
-herdr plugin pane open --plugin haikei.wiki --entrypoint capture \
+herdr plugin pane open --plugin herdr.wiki --entrypoint capture \
   --env WIKI_CAPTURE_TITLE="my note" \
   --env WIKI_CAPTURE_TYPE=claim \
   --env WIKI_CAPTURE_CONTENT="the content to capture" \
@@ -86,7 +86,7 @@ herdr plugin pane open --plugin haikei.wiki --entrypoint capture \
    pending records are marked `inbox:` in results. `--no-inbox` limits the
    search to settled pages. Search is read-only: it never organizes, moves,
    or mutates inbox records.
-3. **Organize** (`herdr plugin action invoke haikei.wiki.organize`) is the
+3. **Organize** (`herdr plugin action invoke herdr.wiki.organize`) is the
    single writer to the graph: it turns each inbox record into a page under
    `<wiki>/wiki/<type>/`, updates `<wiki>/index.md`, appends to `log.md`, and
    moves the record to `inbox/processed/` (or `inbox/rejected/`).
@@ -213,8 +213,48 @@ skills above. (You can use both: the skill for on-demand loading, the
 Find your config dir with:
 
 ```
-herdr plugin config-dir haikei.wiki
+herdr plugin config-dir herdr.wiki
 ```
+
+### Migrating from haikei.wiki
+
+The plugin id changed from `haikei.wiki` to `herdr.wiki` (owner decision,
+2026-11-15); the plugin display name is now "Herdr Wiki". Action names moved
+with the id: `haikei.wiki.search` → `herdr.wiki.search`, and likewise for
+`capture`, `organize` and `context-dump`. To migrate an existing install:
+
+1. Unlink the old id:
+
+   ```
+   herdr plugin unlink haikei.wiki
+   ```
+
+2. Move your config dir — herdr names it by plugin id, so the directory
+   changed with the id:
+
+   ```
+   mkdir -p ~/.config/herdr/plugins/herdr.wiki
+   mv ~/.config/herdr/plugins/haikei.wiki/tbox.toml \
+      ~/.config/herdr/plugins/herdr.wiki/
+   ```
+
+   If you use a custom config root (`HERDR_PLUGIN_CONFIG_DIR`), move
+   `tbox.toml` from the sibling `haikei.wiki` dir the same way. Until you
+   move it, the plugin keeps reading the legacy file and prints a one-line
+   migration hint to stderr — it never copies or deletes your files.
+
+3. Link again:
+
+   ```
+   herdr plugin link /path/to/herdr-wiki-plugin
+   ```
+
+   (or `herdr plugin install Soypete/herdr-wiki-plugin` for a fresh install
+   of the published plugin)
+
+Then update any scripts or keybinding references to the old action names.
+The scheduled launchd job keeps its label and file name
+(`scripts/com.haikei.wiki-organize.plist`) — no unload/load is needed.
 
 ### The closed capture vocabulary
 
@@ -277,7 +317,7 @@ tests/                   # pytest suite
 
 ```
 herdr plugin link /path/to/herdr-wiki-plugin
-herdr plugin action list --plugin haikei.wiki
+herdr plugin action list --plugin herdr.wiki
 
 cd tests && python3 -m pytest -v
 ```

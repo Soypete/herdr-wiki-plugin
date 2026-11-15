@@ -53,7 +53,7 @@ def state_dir() -> Path:
     d = os.environ.get("HERDR_PLUGIN_STATE_DIR")
     if d:
         return Path(d)
-    return Path.home() / ".local" / "state" / "herdr" / "plugins" / "haikei.wiki"
+    return Path.home() / ".local" / "state" / "herdr" / "plugins" / "herdr.wiki"
 
 
 class _Lock:

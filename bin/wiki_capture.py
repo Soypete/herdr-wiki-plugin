@@ -18,7 +18,7 @@ from haikei_wiki.context import parse_provenance, resolve_worktree
 from haikei_wiki.herdr import HerdrError, run
 from haikei_wiki.vocabulary import VocabularyViolation, load_vocabulary
 
-PLUGIN_ID = "haikei.wiki"
+PLUGIN_ID = "herdr.wiki"
 
 
 def main() -> int:

@@ -1,5 +1,5 @@
-id = "haikei.wiki"
-name = "Haikei Wiki"
+id = "herdr.wiki"
+name = "Herdr Wiki"
 version = "0.1.0"
 min_herdr_version = "0.7.5"
 description = "Search the LLM-Wiki and capture provenance-tagged notes into its inbox"
@@ -46,11 +46,11 @@ command = ["python3", "bin/wiki_capture_ui.py"]
 [[keys.command]]
 key = "prefix+w"
 type = "plugin_action"
-command = "haikei.wiki.search"
+command = "herdr.wiki.search"
 description = "wiki search"
 
 [[keys.command]]
 key = "prefix+W"
 type = "plugin_action"
-command = "haikei.wiki.capture"
+command = "herdr.wiki.capture"
 description = "wiki capture"
