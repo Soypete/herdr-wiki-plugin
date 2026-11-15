@@ -106,6 +106,28 @@ coordination, not enforcement.
 `blocker`, `handoff`, `ack`, `contract_change`): a handoff at every status change and at the end, a `blocker`
 when you cannot proceed, a `contract_change` when you change something other workers or repos consume.
 
+## PR closeout
+
+When a PR you worked on merges or closes (or you stop working on it), close out
+your wiki records before the pane closes — wiki decision "PR closeout protocol"
+(2026-11-15):
+
+1. Verify the real state: `gh pr view <N> -R <owner>/<repo> --json state,mergedAt,mergeCommit`.
+2. Capture ONE final handoff titled `<worker>: <repo>#<N> MERGED <sha8>` or
+   `<repo>#<N> CLOSED (<reason>)`, with merge/head sha, CI result and follow-ups.
+3. `wiki supersede` each of your earlier handoffs, claims and blockers about
+   that PR `--by` the final handoff (`wiki withdraw` if one was wrong), and
+   supersede blockers the merge resolves.
+4. `wiki release` every file claim and reservation you hold.
+5. Verify: `wiki search "<repo>#<N>"` shows no page of yours still asserting
+   the PR is open.
+6. Never `wiki delete`: supersede or withdraw keeps history; delete is for the owner.
+
+Orchestrators: each tick, run `gh pr view` for every tracked PR; if one is
+MERGED or CLOSED and the worker has not done steps 2–5, send it this checklist
+and keep its pane open until done. Run `wiki audit` every ~5 tasks and act on
+`merged_pr`, `dead_branch` and `resolved_blocker` findings in your own herd.
+
 ## Conventions to read before writing code
 
 Run these three searches at the start of any task and follow the pages they

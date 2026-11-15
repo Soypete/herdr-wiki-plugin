@@ -45,6 +45,7 @@ Write each brief to `/tmp/briefs/<name>.md`, then send it with `herdr agent prom
 4. PR opened with `gh stack submit` (or `gh pr create`), with a description covering what/why/how-tested.
 5. A wiki `handoff` links task/plan, records wiki queries, changed commits, PR URL, tests and remaining work.
 6. Reply with: PR URL, test command output summary, anything the reviewer should look at first.
+7. When the PR merges or closes (or work on it stops): run the PR closeout steps — the brief's last section — before your pane closes.
 Do not merge.
 
 ## Coordination
@@ -66,6 +67,21 @@ Every brief ends with this **footer** — the coordination terms the worker agre
 - **Scope discipline:** if I would touch a file outside my claim, stop and reply "OUT-OF-SCOPE: <file>" instead of editing it.
 - **Coordination:** your only coordination tools are `wiki claim`/`reserve`/`release` and `wiki capture`. Do not message other workers and do not reorder anything. If your claim overlaps another or a number is already taken, capture a `blocker`, say "BLOCKED: <one line>", and wait for the orchestrator.
 ```
+
+Every brief also ends with the **PR closeout** steps (wiki decision "PR closeout protocol", 2026-11-15) — paste this after the footer as the brief's last section:
+
+```markdown
+## PR closeout
+When your PR merges or closes (or you stop working on it), before your pane closes:
+1. Verify the real state: `gh pr view <N> -R <owner>/<repo> --json state,mergedAt,mergeCommit`.
+2. Capture ONE final handoff titled `<worker>: <repo>#<N> MERGED <sha8>` or `<repo>#<N> CLOSED (<reason>)`, with merge/head sha, CI result and follow-ups.
+3. `wiki supersede` each of your earlier handoffs, claims and blockers about that PR `--by` the final handoff (`wiki withdraw` if one was wrong), including blockers the merge resolves.
+4. `wiki release` every file claim and reservation you hold.
+5. Verify: `wiki search "<repo>#<N>"` shows no page of yours still asserting the PR is open.
+6. Never `wiki delete`: supersede or withdraw keeps history; delete is for the owner.
+```
+
+Orchestrators: each tick, run `gh pr view` for every tracked PR; if one is MERGED or CLOSED and the worker has not done steps 2–5, send it this checklist and keep its pane open until done. Run `wiki audit` every ~5 tasks and act on `merged_pr`, `dead_branch` and `resolved_blocker` findings in your own herd.
 
 **One step per prompt for opencode workers.** opencode sessions drift when a brief gives context but not the exact single step — a one-line test fix once became 1.5h of rebase planning this way. Send one concrete step per prompt: file, line, expected value, and the test command (`<file>:<line>` — make X equal Y, then run Z). Interrupt (`esc`) with a smaller prompt if the worker has not pushed within N minutes.
 
@@ -96,6 +112,7 @@ Web clients currently log users out when the access token expires. This endpoint
 2. `go test ./internal/auth/... ./api/...` passes.
 3. PR via `gh stack submit`.
 4. Reply with PR URL + test summary. Do not merge.
+5. When the PR merges or closes: run the PR closeout steps (the brief's last section) before your pane closes.
 
 ## Coordination
 - If the response shape must change, capture a `contract_change` linked `about:` the refresh decision BEFORE changing it — auth-ui depends on it.
