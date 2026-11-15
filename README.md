@@ -216,6 +216,46 @@ Find your config dir with:
 herdr plugin config-dir herdr.wiki
 ```
 
+### Migrating from haikei.wiki
+
+The plugin id changed from `haikei.wiki` to `herdr.wiki` (owner decision,
+2026-11-15); the plugin display name is now "Herdr Wiki". Action names moved
+with the id: `haikei.wiki.search` → `herdr.wiki.search`, and likewise for
+`capture`, `organize` and `context-dump`. To migrate an existing install:
+
+1. Unlink the old id:
+
+   ```
+   herdr plugin unlink haikei.wiki
+   ```
+
+2. Move your config dir — herdr names it by plugin id, so the directory
+   changed with the id:
+
+   ```
+   mkdir -p ~/.config/herdr/plugins/herdr.wiki
+   mv ~/.config/herdr/plugins/haikei.wiki/tbox.toml \
+      ~/.config/herdr/plugins/herdr.wiki/
+   ```
+
+   If you use a custom config root (`HERDR_PLUGIN_CONFIG_DIR`), move
+   `tbox.toml` from the sibling `haikei.wiki` dir the same way. Until you
+   move it, the plugin keeps reading the legacy file and prints a one-line
+   migration hint to stderr — it never copies or deletes your files.
+
+3. Link again:
+
+   ```
+   herdr plugin link /path/to/herdr-wiki-plugin
+   ```
+
+   (or `herdr plugin install Soypete/herdr-wiki-plugin` for a fresh install
+   of the published plugin)
+
+Then update any scripts or keybinding references to the old action names.
+The scheduled launchd job keeps its label and file name
+(`scripts/com.haikei.wiki-organize.plist`) — no unload/load is needed.
+
 ### The closed capture vocabulary
 
 Entity types and link predicates are enforced at the write boundary from
