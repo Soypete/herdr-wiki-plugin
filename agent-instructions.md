@@ -31,6 +31,23 @@ results to stdout, so run it and read the output.
   pages, empty pages): `wiki audit [--json] [--stale-days N]`
 - **Delete a wiki page or inbox record** (exact match required — no globbing):
   `wiki delete page <path>` or `wiki delete inbox <id>`
+- **PR closeout** — when a PR you worked on merges or closes (or you stop
+  working on it), close out your wiki records before the pane closes (wiki
+  decision "PR closeout protocol", 2026-11-15):
+  - Verify the real state:
+    `gh pr view <N> -R <owner>/<repo> --json state,mergedAt,mergeCommit`.
+  - Capture ONE final handoff titled `<worker>: <repo>#<N> MERGED <sha8>` or
+    `<repo>#<N> CLOSED (<reason>)`, with merge/head sha, CI result and follow-ups.
+  - `wiki supersede` your earlier handoffs, claims and blockers about that PR
+    `--by` the final handoff (`wiki withdraw` if one was wrong), including
+    blockers the merge resolves; `wiki release` every claim and reservation
+    you hold.
+  - Verify: `wiki search "<repo>#<N>"` shows nothing of yours still asserting
+    the PR is open. Never `wiki delete`: supersede or withdraw keeps history;
+    delete is for the owner.
+  - Orchestrators: each tick, check `gh pr view` for every tracked PR; if one
+    is MERGED or CLOSED and the worker has not closed out, send it this
+    checklist and keep its pane open until done. Run `wiki audit` every ~5 tasks.
 
 Rules:
 - `--type` must be one of: `claim`, `contradiction`, `decision`, `entity`,
