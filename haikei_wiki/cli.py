@@ -6,6 +6,7 @@ search popup (a human UI), this prints results to the terminal.
 
 Usage:
     python3 -m haikei_wiki search <query> [--top-k N] [--no-inbox] [--json]
+    python3 -m haikei_wiki inbox [--json]
     python3 -m haikei_wiki show <page> [--json]
     python3 -m haikei_wiki stats
     python3 -m haikei_wiki capture --title T --type T --content C [--link p:t ...]
@@ -399,6 +400,49 @@ def _stats(as_json: bool) -> int:
     return 0
 
 
+def _inbox(as_json: bool) -> int:
+    records = []
+    for path in CaptureInbox(wiki_root()).pending():
+        try:
+            record = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(record, dict):
+            continue
+
+        title = str(record.get("title", ""))
+        entity_type = str(record.get("entity_type", ""))
+        content = str(record.get("content", ""))
+        records.append(
+            {
+                "path": f"inbox:{path.stem}",
+                "source": "inbox",
+                "score": 0.0,
+                "snippet": " ".join(f"[inbox] {title}\n{content}".split())[:300],
+                "title": title,
+                "entity_type": entity_type,
+                "created_at": str(record.get("created_at", "")),
+            }
+        )
+
+    records.sort(
+        key=lambda record: (record["created_at"], record["path"]), reverse=True
+    )
+    if as_json:
+        print(json.dumps({"results": records}, indent=2))
+        return 0
+    if not records:
+        print("no pending captures")
+        return 0
+
+    print(f"{len(records)} pending captures")
+    for record in records:
+        type_label = f" [{record['entity_type']}]" if record["entity_type"] else ""
+        print(f"{record['path']}{type_label} {record['title']}")
+        print(f"    {record['snippet']}")
+    return 0
+
+
 def _capture(args) -> int:
     prov = resolve_worktree(parse_provenance())
     links = []
@@ -730,6 +774,9 @@ def main(argv=None) -> int:
     p_stats = sub.add_parser("stats", help="wiki statistics")
     p_stats.add_argument("--json", action="store_true")
 
+
+    p_inbox = sub.add_parser("inbox", help="list pending capture records")
+    p_inbox.add_argument("--json", action="store_true")
     p_cap = sub.add_parser("capture", help="capture a note into the inbox")
     p_cap.add_argument("--title", required=True)
     p_cap.add_argument("--type", required=True, dest="type")
@@ -848,6 +895,8 @@ def main(argv=None) -> int:
         return _show(args.spec, args.json)
     if args.cmd == "stats":
         return _stats(args.json)
+    if args.cmd == "inbox":
+        return _inbox(args.json)
     if args.cmd == "capture":
         return _capture(args)
     if args.cmd == "organize":
