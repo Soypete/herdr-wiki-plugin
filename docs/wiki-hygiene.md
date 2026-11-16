@@ -89,8 +89,8 @@ decision "Wiki cleanup 2026-11-15: stale blockers, claims, decisions
 withdrawn; completed handoffs superseded".
 
 **Starting point.** `wiki audit` reported **953 findings on 702 of 3460
-pages**. Most of them came from workers that finished a PR and left their
-claims, blockers and "PR open" handoffs behind.
+pages**. Many were records workers left behind after their PR merged:
+claims, blockers and "PR open" handoffs (no exact breakdown was recorded).
 
 **What was done:**
 
@@ -98,8 +98,7 @@ claims, blockers and "PR open" handoffs behind.
    branch was gone, or a later decision had resolved them. No single page
    replaced each one, so withdraw (with a reason) fit better than supersede.
 2. **Withdrew 59 audit-flagged decisions** (dead branch, dead citation or
-   merged PR). These decisions were about work that had finished or been
-   dropped, so they no longer guide anyone.
+   merged PR).
 3. **Superseded 52 completed handoffs** by **one cleanup decision page**: the
    handoffs for work whose PR had merged. They stay as history and point at
    the cleanup decision.
